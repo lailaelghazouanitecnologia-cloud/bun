@@ -23,6 +23,162 @@ Si no usas Python, no está en el binario. Si no emites a JS, no existe.
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## Checkers & Control
+
+### Checkers Comptime
+
+```zig
+// Saber qué está registrado en comptime
+pub fn Registry(comptime config: Config) type {
+    return struct {
+        // Checkers - verificar qué existe
+        pub const has_lexer = config.lang != .none;
+        pub const has_parser = config.lang != .none;
+        pub const has_vm = config.vm;
+        pub const has_optimizer = config.optimize;
+
+        // Qué targets están disponibles
+        pub const targets = config.targets;
+        pub fn hasTarget(comptime t: TargetKind) bool {
+            inline for (targets) |target| {
+                if (target == t) return true;
+            }
+            return false;
+        }
+
+        // Qué features están activas
+        pub const features = config.features;
+        pub fn hasFeature(comptime f: Feature) bool {
+            inline for (features) |feat| {
+                if (feat == f) return true;
+            }
+            return false;
+        }
+    };
+}
+
+// Uso en código
+const reg = Registry(config);
+if (reg.has_vm) {
+    // Código VM - solo existe si vm = true
+}
+if (reg.hasTarget(.wat)) {
+    // Código WAT - solo si target incluye .wat
+}
+```
+
+### User Overrides
+
+```zig
+// Usuario puede override cualquier parte del flujo
+const Compiler = zid.Compiler(.{
+    .lang = .lua,
+    .target = .wat,
+
+    // Override lexer completo
+    .lexer = MyCustomLexer,
+
+    // Override solo keywords
+    .keywords = my_keywords,
+
+    // Override parser parcial
+    .parse_expr = myParseExpr,
+
+    // Override emitter para un opcode específico
+    .emit_add = myEmitAdd,
+
+    // Hook en el pipeline
+    .after_parse = myTransform,
+    .before_emit = myOptimize,
+});
+```
+
+### Override Granular
+
+```zig
+// Override a nivel de opcode
+const MyTarget = zid.Target(.wat, .{
+    // Override solo i32.add
+    .add = struct {
+        pub fn emit(op: *Op) void {
+            op.raw(";; custom add\n");
+            op.raw("i32.add\n");
+        }
+    }.emit,
+
+    // El resto usa default
+});
+
+// Override a nivel de nodo
+const MyParser = zid.Parser(.lua, .{
+    // Override solo parsing de if
+    .parse_if = struct {
+        pub fn parse(p: *Parser) !Node {
+            // Mi lógica custom para if
+        }
+    }.parse,
+});
+```
+
+### Pipeline Hooks
+
+```zig
+const Compiler = zid.Compiler(.{
+    .lang = .lua,
+    .target = .wat,
+
+    // Hooks en cada fase
+    .hooks = .{
+        .on_token = logToken,        // Cada token
+        .on_node = validateNode,     // Cada nodo AST
+        .on_emit = trackEmit,        // Cada emisión
+        .on_error = handleError,     // Cada error
+    },
+
+    // Transformaciones
+    .transforms = &.{
+        deadCodeElimination,
+        constantFolding,
+        inlineSmallFunctions,
+    },
+
+    // Validaciones
+    .validators = &.{
+        checkTypes,
+        checkScopes,
+        checkUnused,
+    },
+});
+```
+
+### Registro Dinámico (Opcional)
+
+```zig
+// Para casos donde necesitas runtime flexibility
+pub const DynamicRegistry = struct {
+    lexers: std.StringHashMap(LexerFn),
+    parsers: std.StringHashMap(ParserFn),
+    emitters: std.StringHashMap(EmitterFn),
+
+    pub fn register(self: *@This(), name: []const u8, component: anytype) void {
+        // Registrar en runtime
+    }
+
+    pub fn has(self: *@This(), name: []const u8) bool {
+        return self.lexers.contains(name) or
+               self.parsers.contains(name) or
+               self.emitters.contains(name);
+    }
+};
+
+// Combinar comptime + runtime
+const compiler = Compiler(.{
+    .lang = .lua,
+    .dynamic = true,  // Habilita registro runtime
+});
+compiler.registry.register("my_transform", myTransform);
+```
+
 ## Arquitectura Comptime
 
 ### 1. Selección en Comptime (no runtime)
