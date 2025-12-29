@@ -477,3 +477,256 @@ zid/
 | Tamaño | ~15MB (todo) | ~9KB-40KB (configurable) |
 
 **Mismo patrón que Bun**: comptime genera código especializado, sin overhead de runtime.
+
+## Ejemplo: Emulador PSP
+
+Mismo patrón - templates (DATA) + engine (CÓDIGO FIJO).
+
+### Templates PSP
+
+```zig
+// platforms/psp/cpu.zig - MIPS R4000 opcodes (DATA)
+pub const Opcode = enum(u6) {
+    // R-Type
+    add = 0x20,
+    sub = 0x22,
+    and_ = 0x24,
+    or_ = 0x25,
+    slt = 0x2A,
+    jr = 0x08,
+    // I-Type
+    addi = 0x08,
+    lw = 0x23,
+    sw = 0x2B,
+    beq = 0x04,
+    bne = 0x05,
+    // J-Type
+    j = 0x02,
+    jal = 0x03,
+    // PSP específicos (VFPU, etc.)
+    vfpu = 0x12,
+};
+
+// Decodificación comptime
+pub const Instruction = packed struct {
+    // R-Type: opcode(6) | rs(5) | rt(5) | rd(5) | shamt(5) | funct(6)
+    funct: u6,
+    shamt: u5,
+    rd: u5,
+    rt: u5,
+    rs: u5,
+    opcode: u6,
+
+    pub inline fn decode(raw: u32) Instruction {
+        return @bitCast(raw);
+    }
+};
+```
+
+### Templates GPU
+
+```zig
+// platforms/psp/gpu.zig - GE Commands (DATA)
+pub const GeCmd = enum(u8) {
+    NOP = 0x00,
+    VADDR = 0x01,
+    IADDR = 0x02,
+    PRIM = 0x04,
+    BEZIER = 0x05,
+    SPLINE = 0x06,
+    JUMP = 0x08,
+    CALL = 0x0A,
+    RET = 0x0B,
+    END = 0x0C,
+    SIGNAL = 0x0E,
+    FINISH = 0x0F,
+    // Texturas
+    TBP0 = 0xA0,
+    TBW0 = 0xA8,
+    // Matrices
+    WORLD = 0x3A,
+    VIEW = 0x3C,
+    PROJ = 0x3E,
+};
+
+pub const GeInstruction = packed struct {
+    data: u24,
+    cmd: u8,
+
+    pub inline fn decode(raw: u32) GeInstruction {
+        return @bitCast(raw);
+    }
+};
+```
+
+### Templates Memoria
+
+```zig
+// platforms/psp/memory.zig - Memory Map (DATA)
+pub const Region = struct {
+    start: u32,
+    end: u32,
+    name: []const u8,
+    handler: HandlerType,
+};
+
+pub const memory_map = &[_]Region{
+    .{ .start = 0x00000000, .end = 0x00FFFFFF, .name = "Scratchpad",  .handler = .ram },
+    .{ .start = 0x04000000, .end = 0x041FFFFF, .name = "VRAM",        .handler = .vram },
+    .{ .start = 0x08000000, .end = 0x09FFFFFF, .name = "User RAM",    .handler = .ram },
+    .{ .start = 0x1C000000, .end = 0x1FBFFFFF, .name = "HW Registers",.handler = .hw },
+    .{ .start = 0xBFC00000, .end = 0xBFCFFFFF, .name = "BIOS",        .handler = .rom },
+};
+```
+
+### Engine CPU (CÓDIGO FIJO)
+
+```zig
+// engine/cpu.zig - CPU Loop (FIJO)
+pub fn Cpu(comptime platform: type) type {
+    return struct {
+        regs: [32]u32 = [_]u32{0} ** 32,
+        pc: u32 = 0xBFC00000,
+        hi: u32 = 0,
+        lo: u32 = 0,
+        mem: *platform.Memory,
+
+        pub fn step(self: *@This()) void {
+            const raw = self.mem.read32(self.pc);
+            const inst = platform.Instruction.decode(raw);
+            self.pc += 4;
+
+            // Dispatch por opcode - comptime genera switch optimizado
+            switch (inst.opcode) {
+                0x00 => self.execR(inst),  // R-Type
+                0x02 => self.execJ(inst),  // J
+                0x03 => self.execJal(inst),
+                0x04 => self.execBeq(inst),
+                0x23 => self.execLw(inst),
+                0x2B => self.execSw(inst),
+                else => {},
+            }
+        }
+
+        inline fn execR(self: *@This(), inst: platform.Instruction) void {
+            switch (inst.funct) {
+                0x20 => self.regs[inst.rd] = self.regs[inst.rs] +% self.regs[inst.rt], // ADD
+                0x22 => self.regs[inst.rd] = self.regs[inst.rs] -% self.regs[inst.rt], // SUB
+                0x24 => self.regs[inst.rd] = self.regs[inst.rs] & self.regs[inst.rt],  // AND
+                0x25 => self.regs[inst.rd] = self.regs[inst.rs] | self.regs[inst.rt],  // OR
+                0x08 => self.pc = self.regs[inst.rs],  // JR
+                else => {},
+            }
+            self.regs[0] = 0;  // $zero siempre 0
+        }
+    };
+}
+```
+
+### Engine GPU (CÓDIGO FIJO)
+
+```zig
+// engine/gpu.zig - GE Processor (FIJO)
+pub fn Gpu(comptime platform: type) type {
+    return struct {
+        list_addr: u32 = 0,
+        vertices: std.ArrayList(Vertex),
+        matrices: Matrices,
+
+        pub fn processCommand(self: *@This(), raw: u32) void {
+            const cmd = platform.GeInstruction.decode(raw);
+
+            switch (cmd.cmd) {
+                0x04 => self.drawPrimitive(cmd.data),  // PRIM
+                0x3A => self.setWorldMatrix(),         // WORLD
+                0x3C => self.setViewMatrix(),          // VIEW
+                0xA0 => self.setTextureBase(cmd.data), // TBP0
+                0x0C => return,                        // END
+                else => {},
+            }
+        }
+    };
+}
+```
+
+### Config Comptime PSP
+
+```zig
+// build.zig
+const Emulator = zid.Emulator(.{
+    .platform = .psp,
+
+    // Solo lo que necesitas
+    .cpu = true,
+    .gpu = true,
+    .audio = false,  // No existe en binario
+    .wifi = false,
+
+    // Features específicas
+    .features = .{
+        .vfpu = true,   // Vector FPU
+        .me = false,    // Media Engine
+    },
+
+    // Overrides
+    .cpu_step = myOptimizedStep,  // Override CPU loop
+});
+```
+
+### API PSP
+
+```zig
+const psp = @import("zid").Emulator(.{ .platform = .psp });
+
+pub fn main() !void {
+    var emu = psp.init(allocator);
+
+    // Cargar ISO/ELF
+    try emu.load("game.iso");
+
+    // Loop principal
+    while (emu.running) {
+        // CPU ejecuta instrucciones
+        emu.cpu.runFrame();
+
+        // GPU renderiza
+        emu.gpu.renderFrame();
+
+        // Sync a 60fps
+        emu.sync();
+    }
+}
+```
+
+### Estructura PSP
+
+```
+zid/
+├── platforms/
+│   ├── psp/
+│   │   ├── cpu.zig       # Opcodes MIPS (templates)
+│   │   ├── gpu.zig       # GE Commands (templates)
+│   │   ├── memory.zig    # Memory map (templates)
+│   │   ├── audio.zig     # Audio regs (templates)
+│   │   └── hw.zig        # HW registers (templates)
+│   │
+│   ├── gba/              # Mismo patrón para GBA
+│   ├── nes/              # Mismo patrón para NES
+│   └── n64/              # Mismo patrón para N64
+│
+├── engine/
+│   ├── cpu.zig           # CPU loop genérico (fijo)
+│   ├── gpu.zig           # GPU renderer genérico (fijo)
+│   └── scheduler.zig     # Event scheduler (fijo)
+```
+
+### Métricas PSP
+
+| Config | Binario |
+|--------|---------|
+| PSP CPU only | ~15KB |
+| PSP CPU + GPU | ~45KB |
+| PSP completo | ~80KB |
+| PSP + GBA | ~120KB |
+
+**Mismo patrón**: Templates (opcodes, commands) + Engine (loops fijos) = Emulador configurable.
