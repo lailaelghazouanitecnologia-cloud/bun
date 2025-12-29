@@ -41,7 +41,6 @@ pub const Lexer = struct {
             }
             const text = self.source[start..self.pos];
 
-            // Check keywords
             inline for (t.keywords) |kw| {
                 if (std.mem.eql(u8, text, kw[0])) {
                     return .{ .kind = kw[1], .start = start, .end = self.pos };
@@ -66,11 +65,10 @@ pub const Lexer = struct {
 
     fn skipWhitespace(self: *Lexer) void {
         while (self.pos < self.source.len) {
-            const c = self.source[self.pos];
-            if (c == ' ' or c == '\t' or c == '\n' or c == '\r') {
+            const ch = self.source[self.pos];
+            if (ch == ' ' or ch == '\t' or ch == '\n' or ch == '\r') {
                 self.pos += 1;
-            } else if (c == '-' and self.pos + 1 < self.source.len and self.source[self.pos + 1] == '-') {
-                // Comment: skip to end of line
+            } else if (ch == '-' and self.pos + 1 < self.source.len and self.source[self.pos + 1] == '-') {
                 while (self.pos < self.source.len and self.source[self.pos] != '\n') {
                     self.pos += 1;
                 }
@@ -108,14 +106,11 @@ pub const Parser = struct {
             if (self.check(.kw_function)) {
                 try funcs.append(try self.parseFunction());
             } else {
-                self.pos += 1; // skip unknown
+                self.pos += 1;
             }
         }
 
-        return .{
-            .kind = .program,
-            .children = try funcs.toOwnedSlice(),
-        };
+        return .{ .kind = .program, .children = try funcs.toOwnedSlice() };
     }
 
     fn parseFunction(self: *Parser) !t.Node {
@@ -125,27 +120,19 @@ pub const Parser = struct {
         _ = self.expect(.lparen);
         var params = std.ArrayList(t.Node).init(self.allocator);
         while (!self.check(.rparen)) {
-            try params.append(.{
-                .kind = .param,
-                .token = self.expect(.ident),
-            });
+            try params.append(.{ .kind = .param, .token = self.expect(.ident) });
             if (!self.match(.comma)) break;
         }
         _ = self.expect(.rparen);
 
         const body = try self.parseBlock();
-
         _ = self.expect(.kw_end);
 
         var children = std.ArrayList(t.Node).init(self.allocator);
         try children.appendSlice(try params.toOwnedSlice());
         try children.append(body);
 
-        return .{
-            .kind = .func_decl,
-            .token = name,
-            .children = try children.toOwnedSlice(),
-        };
+        return .{ .kind = .func_decl, .token = name, .children = try children.toOwnedSlice() };
     }
 
     fn parseBlock(self: *Parser) !t.Node {
@@ -163,29 +150,21 @@ pub const Parser = struct {
             }
         }
 
-        return .{
-            .kind = .block,
-            .children = try stmts.toOwnedSlice(),
-        };
+        return .{ .kind = .block, .children = try stmts.toOwnedSlice() };
     }
 
     fn parseReturn(self: *Parser) !t.Node {
         _ = self.expect(.kw_return);
-        return .{
-            .kind = .return_stmt,
-            .children = &.{try self.parseExpr()},
-        };
+        const expr = try self.parseExpr();
+        return .{ .kind = .return_stmt, .children = @constCast(&[_]t.Node{expr}) };
     }
 
     fn parseLocal(self: *Parser) !t.Node {
         _ = self.expect(.kw_local);
         const name = self.expect(.ident);
         _ = self.expect(.eq);
-        return .{
-            .kind = .local_decl,
-            .token = name,
-            .children = &.{try self.parseExpr()},
-        };
+        const expr = try self.parseExpr();
+        return .{ .kind = .local_decl, .token = name, .children = @constCast(&[_]t.Node{expr}) };
     }
 
     fn parseIf(self: *Parser) !t.Node {
@@ -202,10 +181,7 @@ pub const Parser = struct {
             try children.append(try self.parseBlock());
         }
 
-        return .{
-            .kind = .if_stmt,
-            .children = try children.toOwnedSlice(),
-        };
+        return .{ .kind = .if_stmt, .children = try children.toOwnedSlice() };
     }
 
     fn parseExpr(self: *Parser) !t.Node {
@@ -215,11 +191,12 @@ pub const Parser = struct {
             const op = self.current();
             self.pos += 1;
             const right = try self.parsePrimary();
-            left = .{
-                .kind = .binary_expr,
-                .token = op,
-                .children = &.{ left, right },
-            };
+
+            var children = try self.allocator.alloc(t.Node, 2);
+            children[0] = left;
+            children[1] = right;
+
+            left = .{ .kind = .binary_expr, .token = op, .children = children };
         }
 
         return left;
@@ -229,18 +206,13 @@ pub const Parser = struct {
         if (self.check(.number)) {
             const tok = self.current();
             self.pos += 1;
-            return .{
-                .kind = .number_lit,
-                .token = tok,
-                .value = tok.text(self.source),
-            };
+            return .{ .kind = .number_lit, .token = tok, .value = tok.text(self.source) };
         }
 
         if (self.check(.ident)) {
             const tok = self.current();
             self.pos += 1;
 
-            // Function call?
             if (self.match(.lparen)) {
                 var args = std.ArrayList(t.Node).init(self.allocator);
                 while (!self.check(.rparen)) {
@@ -248,17 +220,10 @@ pub const Parser = struct {
                     if (!self.match(.comma)) break;
                 }
                 _ = self.expect(.rparen);
-                return .{
-                    .kind = .call_expr,
-                    .token = tok,
-                    .children = try args.toOwnedSlice(),
-                };
+                return .{ .kind = .call_expr, .token = tok, .children = try args.toOwnedSlice() };
             }
 
-            return .{
-                .kind = .identifier,
-                .token = tok,
-            };
+            return .{ .kind = .identifier, .token = tok };
         }
 
         if (self.match(.lparen)) {
@@ -310,23 +275,37 @@ pub const Emitter = struct {
     source: []const u8,
     locals: std.StringHashMap(u32),
     local_count: u32 = 0,
-    allocator: std.mem.Allocator,
 
     pub fn emit(self: *Emitter, node: t.Node) ![]const u8 {
         try self.emitNode(node);
         return self.output.items;
     }
 
+    // Una sola llamada para escribir con formato
+    fn print(self: *Emitter, comptime fmt: []const u8, args: anytype) !void {
+        // Indent
+        var i: u32 = 0;
+        while (i < self.indent) : (i += 1) {
+            try self.output.appendSlice("  ");
+        }
+        // Format
+        try self.output.writer().print(fmt, args);
+    }
+
+    fn raw(self: *Emitter, comptime fmt: []const u8, args: anytype) !void {
+        try self.output.writer().print(fmt, args);
+    }
+
     fn emitNode(self: *Emitter, node: t.Node) !void {
         switch (node.kind) {
             .program => {
-                try self.write("(module\n");
+                try self.raw("(module\n", .{});
                 self.indent += 1;
                 for (node.children) |child| {
                     try self.emitNode(child);
                 }
                 self.indent -= 1;
-                try self.write(")\n");
+                try self.raw(")\n", .{});
             },
 
             .func_decl => {
@@ -334,25 +313,20 @@ pub const Emitter = struct {
                 self.locals.clearRetainingCapacity();
                 self.local_count = 0;
 
-                try self.writeIndent();
-                try self.write("(func $");
-                try self.write(name);
-
                 // Params
                 var param_count: u32 = 0;
+                var params_str = std.ArrayList(u8).init(self.output.allocator);
                 for (node.children) |child| {
                     if (child.kind == .param) {
                         const pname = child.token.?.text(self.source);
-                        try self.write(" (param $");
-                        try self.write(pname);
-                        try self.write(" i32)");
+                        try params_str.writer().print(" (param ${s} i32)", .{pname});
                         try self.locals.put(pname, param_count);
                         param_count += 1;
                     }
                 }
                 self.local_count = param_count;
 
-                try self.write(" (result i32)\n");
+                try self.print("(func ${s}{s} (result i32)\n", .{ name, params_str.items });
                 self.indent += 1;
 
                 // Body
@@ -365,16 +339,8 @@ pub const Emitter = struct {
                 }
 
                 self.indent -= 1;
-                try self.writeIndent();
-                try self.write(")\n");
-
-                // Export
-                try self.writeIndent();
-                try self.write("(export \"");
-                try self.write(name);
-                try self.write("\" (func $");
-                try self.write(name);
-                try self.write("))\n");
+                try self.print(")\n", .{});
+                try self.print("(export \"{s}\" (func ${s}))\n", .{ name, name });
             },
 
             .return_stmt => {
@@ -388,117 +354,74 @@ pub const Emitter = struct {
                 try self.locals.put(name, self.local_count);
                 self.local_count += 1;
 
-                // Emit value
                 for (node.children) |child| {
                     try self.emitNode(child);
                 }
-
-                try self.writeIndent();
-                try self.write("local.set $");
-                try self.write(name);
-                try self.write("\n");
+                try self.print("local.set ${s}\n", .{name});
             },
 
             .if_stmt => {
-                // Condition
-                try self.emitNode(node.children[0]);
+                try self.emitNode(node.children[0]); // condition
 
-                try self.writeIndent();
-                try self.write("(if (result i32)\n");
+                try self.print("(if (result i32)\n", .{});
                 self.indent += 1;
 
-                // Then
-                try self.writeIndent();
-                try self.write("(then\n");
+                try self.print("(then\n", .{});
                 self.indent += 1;
                 for (node.children[1].children) |stmt| {
                     try self.emitNode(stmt);
                 }
                 self.indent -= 1;
-                try self.writeIndent();
-                try self.write(")\n");
+                try self.print(")\n", .{});
 
-                // Else
-                try self.writeIndent();
-                try self.write("(else\n");
+                try self.print("(else\n", .{});
                 self.indent += 1;
                 if (node.children.len > 2) {
                     for (node.children[2].children) |stmt| {
                         try self.emitNode(stmt);
                     }
                 } else {
-                    try self.writeIndent();
-                    try self.write("i32.const 0\n");
+                    try self.print("i32.const 0\n", .{});
                 }
                 self.indent -= 1;
-                try self.writeIndent();
-                try self.write(")\n");
+                try self.print(")\n", .{});
 
                 self.indent -= 1;
-                try self.writeIndent();
-                try self.write(")\n");
+                try self.print(")\n", .{});
             },
 
             .binary_expr => {
-                // Left
                 try self.emitNode(node.children[0]);
-                // Right
                 try self.emitNode(node.children[1]);
 
-                // Operator
-                const op = node.token.?.kind;
-                try self.writeIndent();
-                switch (op) {
-                    .plus => try self.write("i32.add\n"),
-                    .minus => try self.write("i32.sub\n"),
-                    .star => try self.write("i32.mul\n"),
-                    .slash => try self.write("i32.div_s\n"),
-                    .lt => try self.write("i32.lt_s\n"),
-                    .gt => try self.write("i32.gt_s\n"),
-                    else => {},
-                }
+                const op_str = switch (node.token.?.kind) {
+                    .plus => "i32.add",
+                    .minus => "i32.sub",
+                    .star => "i32.mul",
+                    .slash => "i32.div_s",
+                    .lt => "i32.lt_s",
+                    .gt => "i32.gt_s",
+                    else => "nop",
+                };
+                try self.print("{s}\n", .{op_str});
             },
 
             .call_expr => {
-                // Args
                 for (node.children) |arg| {
                     try self.emitNode(arg);
                 }
-
-                const name = node.token.?.text(self.source);
-                try self.writeIndent();
-                try self.write("call $");
-                try self.write(name);
-                try self.write("\n");
+                try self.print("call ${s}\n", .{node.token.?.text(self.source)});
             },
 
             .identifier => {
-                const name = node.token.?.text(self.source);
-                try self.writeIndent();
-                try self.write("local.get $");
-                try self.write(name);
-                try self.write("\n");
+                try self.print("local.get ${s}\n", .{node.token.?.text(self.source)});
             },
 
             .number_lit => {
-                try self.writeIndent();
-                try self.write("i32.const ");
-                try self.write(node.value orelse "0");
-                try self.write("\n");
+                try self.print("i32.const {s}\n", .{node.value orelse "0"});
             },
 
             else => {},
-        }
-    }
-
-    fn write(self: *Emitter, str: []const u8) !void {
-        try self.output.appendSlice(str);
-    }
-
-    fn writeIndent(self: *Emitter) !void {
-        var i: u32 = 0;
-        while (i < self.indent) : (i += 1) {
-            try self.output.appendSlice("  ");
         }
     }
 };
