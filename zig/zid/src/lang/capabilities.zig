@@ -30,6 +30,110 @@ pub const Capabilities = struct {
     // ============ RUNTIME ============
     runtime: Runtime = .{},
 
+    // ============ PASSTHROUGH ============
+    /// Features that can be preserved as-is if target doesn't support them
+    /// These don't affect runtime behavior, so they're safe to ignore
+    passthrough: Passthrough = .{},
+
+    pub const Passthrough = struct {
+        // Comments and documentation
+        comments: bool = true, // Can preserve comments
+        doc_comments: bool = true, // Can preserve doc strings
+
+        // Type annotations (in dynamic languages)
+        type_hints: bool = false, // Python type hints, TS types
+
+        // Decorators/attributes that are metadata-only
+        annotations: bool = false, // @deprecated, #[allow], etc.
+
+        // Compiler directives
+        pragmas: bool = false, // #pragma, compiler hints
+
+        // Debug info
+        debug_info: bool = true, // Source maps, line numbers
+
+        // Formatting
+        whitespace: bool = true, // Preserve formatting style
+
+        // Custom extensions
+        custom_syntax: bool = false, // Language extensions
+    };
+
+    /// Feature behavior when not supported by target
+    pub const FeatureAction = enum {
+        error_, // Fail compilation
+        warn, // Warn but continue
+        transform, // Convert to supported equivalent
+        passthrough, // Keep as-is (no runtime effect)
+        drop, // Silently remove
+    };
+
+    /// Get action for unsupported feature
+    pub fn getFeatureAction(self: Capabilities, feature: Feature) FeatureAction {
+        return switch (feature) {
+            // Always error on critical features
+            .threads => if (!self.concurrency.has_threads) .error_ else .passthrough,
+            .async_await => if (!self.concurrency.has_async_await) .transform else .passthrough,
+
+            // Transform when possible
+            .generics => if (!self.types.has_generics) .transform else .passthrough, // monomorphize
+            .option => if (!self.types.has_option) .transform else .passthrough, // to nullable
+            .result => if (!self.types.has_result) .transform else .passthrough, // to tuple
+            .closures => if (!self.functions.has_closures) .transform else .passthrough, // to fn+env
+            .pattern_match => if (!self.control.has_match) .transform else .passthrough, // to if/switch
+
+            // Warn but continue
+            .borrow_check => if (!self.memory.has_borrow_checker) .warn else .passthrough,
+            .lifetimes => if (!self.memory.has_lifetimes) .warn else .passthrough,
+
+            // Safe to drop
+            .type_hints => if (self.passthrough.type_hints) .passthrough else .drop,
+            .annotations => if (self.passthrough.annotations) .passthrough else .drop,
+            .doc_comments => if (self.passthrough.doc_comments) .passthrough else .drop,
+            .comments => if (self.passthrough.comments) .passthrough else .drop,
+            .pragmas => if (self.passthrough.pragmas) .passthrough else .drop,
+
+            // Default
+            _ => .warn,
+        };
+    }
+
+    pub const Feature = enum {
+        // Types
+        generics,
+        option,
+        result,
+        traits,
+
+        // Concurrency
+        threads,
+        async_await,
+        promises,
+        channels,
+
+        // Memory
+        borrow_check,
+        lifetimes,
+        manual_memory,
+
+        // Functions
+        closures,
+        generators,
+        tail_calls,
+
+        // Control
+        pattern_match,
+        exceptions,
+
+        // Passthrough (no runtime effect)
+        type_hints,
+        annotations,
+        doc_comments,
+        comments,
+        pragmas,
+        debug_info,
+    };
+
     pub const TypeSystem = struct {
         // Primitive types
         has_integers: bool = true,
@@ -203,56 +307,54 @@ pub const Capabilities = struct {
     pub fn canTranspileTo(self: Capabilities, target: Capabilities) CompatResult {
         var result = CompatResult{};
 
-        // Check type system compatibility
-        if (self.types.has_generics and !target.types.has_generics) {
-            result.addWarning("Generics will be monomorphized or erased");
-        }
-        if (self.types.has_option and !target.types.has_option) {
-            result.addWarning("Option types will be lowered to nullable or tagged unions");
-        }
-        if (self.types.has_result and !target.types.has_result) {
-            result.addWarning("Result types will be lowered to tuples or error codes");
-        }
-        if (self.types.has_interfaces and !target.types.has_interfaces) {
-            result.addWarning("Traits/interfaces will be lowered to vtables or static dispatch");
-        }
+        // Check each feature using the action system
+        const features_to_check = [_]struct { feature: Feature, source_has: bool, target_has: bool, msg: []const u8 }{
+            .{ .feature = .generics, .source_has = self.types.has_generics, .target_has = target.types.has_generics, .msg = "Generics will be monomorphized" },
+            .{ .feature = .option, .source_has = self.types.has_option, .target_has = target.types.has_option, .msg = "Option<T> will be lowered to nullable" },
+            .{ .feature = .result, .source_has = self.types.has_result, .target_has = target.types.has_result, .msg = "Result<T,E> will be lowered to tuple/error code" },
+            .{ .feature = .traits, .source_has = self.types.has_interfaces, .target_has = target.types.has_interfaces, .msg = "Traits will use static dispatch or vtables" },
+            .{ .feature = .threads, .source_has = self.concurrency.has_threads, .target_has = target.concurrency.has_threads, .msg = "Threads not supported in target" },
+            .{ .feature = .async_await, .source_has = self.concurrency.has_async_await, .target_has = target.concurrency.has_async_await, .msg = "Async/await will be transformed" },
+            .{ .feature = .closures, .source_has = self.functions.has_closures, .target_has = target.functions.has_closures, .msg = "Closures will be converted to fn+environment" },
+            .{ .feature = .pattern_match, .source_has = self.control.has_match, .target_has = target.control.has_match, .msg = "Pattern matching will use if/switch" },
+            .{ .feature = .borrow_check, .source_has = self.memory.has_borrow_checker, .target_has = target.memory.has_borrow_checker, .msg = "Borrow checking not enforced at runtime" },
+            .{ .feature = .lifetimes, .source_has = self.memory.has_lifetimes, .target_has = target.memory.has_lifetimes, .msg = "Lifetimes will be erased" },
+            .{ .feature = .generators, .source_has = self.functions.has_generators, .target_has = target.functions.has_generators, .msg = "Generators will be transformed to state machines" },
+            .{ .feature = .exceptions, .source_has = self.control.has_exceptions, .target_has = target.control.has_exceptions, .msg = "Exceptions will use error codes" },
+        };
 
-        // Check concurrency compatibility
-        if (self.concurrency.has_async_await and !target.concurrency.has_async_await) {
-            if (!target.concurrency.has_promises and !target.concurrency.has_callbacks()) {
-                result.addError("Async/await requires target support for async or callbacks");
-            } else {
-                result.addWarning("Async/await will be transformed to callbacks/promises");
-            }
-        }
-        if (self.concurrency.has_threads and !target.concurrency.has_threads) {
-            result.addError("Threads not supported in target");
-        }
-
-        // Check memory compatibility
-        if (self.memory.has_manual and target.memory.has_gc) {
-            result.addWarning("Manual memory management will use GC in target");
-        }
-        if (self.memory.has_borrow_checker and !target.memory.has_borrow_checker) {
-            result.addWarning("Borrow checking will not be enforced at runtime");
-        }
-
-        // Check function compatibility
-        if (self.functions.has_closures and !target.functions.has_closures) {
-            if (target.functions.has_first_class) {
-                result.addWarning("Closures will be converted to function + environment");
-            } else {
-                result.addError("Target does not support closures or first-class functions");
+        for (features_to_check) |check| {
+            if (check.source_has and !check.target_has) {
+                const action = target.getFeatureAction(check.feature);
+                switch (action) {
+                    .error_ => result.addError(check.msg),
+                    .warn => result.addWarning(check.msg),
+                    .transform => result.addInfo(check.msg),
+                    .passthrough, .drop => {}, // Silent
+                }
             }
         }
 
         return result;
+    }
+
+    /// Check if a specific feature needs transformation
+    pub fn needsTransform(self: Capabilities, target: Capabilities, feature: Feature) bool {
+        const action = target.getFeatureAction(feature);
+        return action == .transform;
+    }
+
+    /// Check if a feature can be passed through unchanged
+    pub fn canPassthrough(self: Capabilities, feature: Feature) bool {
+        const action = self.getFeatureAction(feature);
+        return action == .passthrough;
     }
 };
 
 pub const CompatResult = struct {
     errors: std.BoundedArray([]const u8, 32) = .{},
     warnings: std.BoundedArray([]const u8, 32) = .{},
+    info: std.BoundedArray([]const u8, 32) = .{}, // Transforms that will happen
 
     pub fn addError(self: *CompatResult, msg: []const u8) void {
         self.errors.append(msg) catch {};
@@ -262,12 +364,20 @@ pub const CompatResult = struct {
         self.warnings.append(msg) catch {};
     }
 
+    pub fn addInfo(self: *CompatResult, msg: []const u8) void {
+        self.info.append(msg) catch {};
+    }
+
     pub fn isCompatible(self: CompatResult) bool {
         return self.errors.len == 0;
     }
 
     pub fn hasWarnings(self: CompatResult) bool {
         return self.warnings.len > 0;
+    }
+
+    pub fn hasTransforms(self: CompatResult) bool {
+        return self.info.len > 0;
     }
 };
 
