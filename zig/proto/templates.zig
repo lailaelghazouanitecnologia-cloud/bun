@@ -1,7 +1,5 @@
 // Templates: datos que definen el lenguaje
 
-// ============ TOKENS ============
-
 pub const TokenKind = enum {
     // Literals
     number,
@@ -15,6 +13,8 @@ pub const TokenKind = enum {
     kw_if,
     kw_then,
     kw_else,
+    kw_while,
+    kw_do,
 
     // Operators
     plus,
@@ -53,6 +53,8 @@ pub const keywords = .{
     .{ "if", .kw_if },
     .{ "then", .kw_then },
     .{ "else", .kw_else },
+    .{ "while", .kw_while },
+    .{ "do", .kw_do },
 };
 
 pub const operators = .{
@@ -68,8 +70,6 @@ pub const operators = .{
     .{ ",", .comma },
 };
 
-// ============ AST NODES ============
-
 pub const NodeKind = enum {
     program,
     func_decl,
@@ -78,6 +78,7 @@ pub const NodeKind = enum {
     return_stmt,
     local_decl,
     if_stmt,
+    while_stmt,
     binary_expr,
     call_expr,
     identifier,
@@ -89,31 +90,4 @@ pub const Node = struct {
     token: ?Token = null,
     children: []Node = &.{},
     value: ?[]const u8 = null,
-};
-
-// ============ WAT OPCODES ============
-
-pub const WatOp = enum {
-    local_get,
-    local_set,
-    i32_const,
-    i32_add,
-    i32_sub,
-    i32_mul,
-    i32_div_s,
-    i32_lt_s,
-    i32_gt_s,
-    call,
-    @"if",
-    @"else",
-    end,
-};
-
-pub const op_map = .{
-    .{ .plus, .i32_add },
-    .{ .minus, .i32_sub },
-    .{ .star, .i32_mul },
-    .{ .slash, .i32_div_s },
-    .{ .lt, .i32_lt_s },
-    .{ .gt, .i32_gt_s },
 };
