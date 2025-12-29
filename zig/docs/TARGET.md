@@ -1,307 +1,323 @@
-# Zid - Target Final
+# Zid - Target Final (Comptime)
 
 ## Visión
 
-Runtime dinámico y modular. Componentes intercambiables.
+**Zero-cost abstractions** como Bun. Comptime genera código especializado.
+Si no usas Python, no está en el binario. Si no emites a JS, no existe.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         ZID                                 │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   ┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐ │
-│   │ Lexer   │───▶│ Parser  │───▶│ Runtime │───▶│ Target  │ │
-│   │ Plugin  │    │ Plugin  │    │ Plugin  │    │ Plugin  │ │
-│   └─────────┘    └─────────┘    └─────────┘    └─────────┘ │
-│        │              │              │              │       │
-│        ▼              ▼              ▼              ▼       │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │                    TEMPLATES                        │  │
-│   │  tokens, nodes, opcodes, rules, validators          │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                            │                                │
-│                            ▼                                │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │                      OP                             │  │
-│   │  Helpers unificados para emitir a cualquier target  │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
+│                    COMPTIME                                  │
+│   ┌─────────┐    ┌─────────┐    ┌─────────┐                 │
+│   │  Lang   │    │ Target  │    │Features │                 │
+│   │  .lua   │    │  .wat   │    │  .vm    │                 │
+│   └────┬────┘    └────┬────┘    └────┬────┘                 │
+│        │              │              │                       │
+│        └──────────────┴──────────────┘                       │
+│                       │                                      │
+│                       ▼                                      │
+│            ┌─────────────────────┐                          │
+│            │  SPECIALIZED BUILD  │                          │
+│            │  Solo código usado  │                          │
+│            └─────────────────────┘                          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## Componentes
+## Arquitectura Comptime
 
-### 1. Templates (Datos)
+### 1. Selección en Comptime (no runtime)
 
 ```zig
-// Cada lenguaje define sus templates
-const lua = @import("langs/lua.zig");
-const python = @import("langs/python.zig");
-const custom = @import("langs/my_dsl.zig");
+// build.zig - Usuario configura qué necesita
+pub fn build(b: *std.Build) void {
+    const exe = b.addExecutable(.{
+        .name = "my_transpiler",
+        .root_source_file = .{ .path = "main.zig" },
+    });
 
-// Selección dinámica
-const lang = switch (ext) {
-    ".lua" => lua.templates,
-    ".py" => python.templates,
-    ".dsl" => custom.templates,
-    else => default.templates,
+    // Solo compila lo que necesitas
+    const options = b.addOptions();
+    options.addOption(Lang, "lang", .lua);      // Solo Lua
+    options.addOption(Target, "target", .wat);  // Solo WAT
+    options.addOption(bool, "vm", false);       // Sin VM
+
+    exe.addOptions("config", options);
+}
+```
+
+### 2. Generación Especializada
+
+```zig
+// zid.zig - Genera tipos especializados en comptime
+const config = @import("config");
+
+// Solo existe el lexer de Lua si lang = .lua
+pub const Lexer = switch (config.lang) {
+    .lua => @import("langs/lua/lexer.zig").Lexer,
+    .python => @import("langs/python/lexer.zig").Lexer,
+    .lisp => @import("langs/lisp/lexer.zig").Lexer,
+};
+
+// Solo existe el emitter de WAT si target = .wat
+pub const Emitter = switch (config.target) {
+    .wat => @import("targets/wat.zig").Emitter,
+    .js => @import("targets/js.zig").Emitter,
+    .bytecode => @import("targets/bytecode.zig").Emitter,
+};
+
+// VM solo existe si vm = true
+pub const VM = if (config.vm)
+    @import("runtime/vm.zig").VM
+else
+    void;
+```
+
+### 3. Zero-Cost Op
+
+```zig
+// Op especializado - sin vtables, todo inline
+pub fn Op(comptime TargetType: type) type {
+    return struct {
+        target: *TargetType,
+
+        // Todas las funciones son inline
+        pub inline fn add(self: @This()) void {
+            self.target.add();
+        }
+
+        pub inline fn local_get(self: @This(), name: []const u8) void {
+            self.target.local_get(name);
+        }
+
+        pub inline fn call(self: @This(), name: []const u8) void {
+            self.target.call(name);
+        }
+    };
+}
+
+// Uso - cero overhead
+var wat_target = WatTarget.init(&output);
+var op = Op(WatTarget){ .target = &wat_target };
+op.add();  // Inline directo a: output.append("i32.add\n")
+```
+
+### 4. Templates Comptime
+
+```zig
+// langs/lua.zig - Todo resuelto en comptime
+pub const keywords = comptimeStringMap(TokenKind, .{
+    .{ "function", .kw_function },
+    .{ "end", .kw_end },
+    .{ "return", .kw_return },
+    .{ "local", .kw_local },
+    .{ "while", .kw_while },
+    .{ "if", .kw_if },
+});
+
+pub const Lexer = struct {
+    source: []const u8,
+    pos: u32 = 0,
+
+    // Lookup en O(1) con perfect hash generado en comptime
+    pub inline fn checkKeyword(self: *@This(), text: []const u8) TokenKind {
+        return keywords.get(text) orelse .ident;
+    }
 };
 ```
 
-### 2. Op (Emisión unificada)
+## Comparación: Dinámico vs Comptime
+
+### Dinámico (lento)
 
 ```zig
-// Op genérico - mismo API para cualquier target
-pub const Op = struct {
-    target: Target,
+// Runtime dispatch - LENTO
+const Emitter = struct {
+    vtable: *const VTable,  // Indirección
 
-    // Estructura
-    pub fn module(self: *Op) void { self.target.module(); }
-    pub fn func(self: *Op, name: []const u8) void { self.target.func(name); }
-    pub fn end(self: *Op) void { self.target.end(); }
-
-    // Operaciones
-    pub fn add(self: *Op) void { self.target.add(); }
-    pub fn sub(self: *Op) void { self.target.sub(); }
-    pub fn call(self: *Op, name: []const u8) void { self.target.call(name); }
-
-    // Variables
-    pub fn local_get(self: *Op, name: []const u8) void { self.target.local_get(name); }
-    pub fn local_set(self: *Op, name: []const u8) void { self.target.local_set(name); }
-};
-```
-
-### 3. Targets (Salida)
-
-```zig
-// WAT
-pub const WatTarget = struct {
-    pub fn add(self: *@This()) void { self.emit("i32.add\n"); }
-    pub fn func(self: *@This(), name: []const u8) void {
-        self.emit("(func ${s}\n", .{name});
-    }
-};
-
-// JavaScript
-pub const JsTarget = struct {
-    pub fn add(self: *@This()) void { self.emit(" + "); }
-    pub fn func(self: *@This(), name: []const u8) void {
-        self.emit("function {s}(", .{name});
-    }
-};
-
-// Bytecode (runtime propio)
-pub const BytecodeTarget = struct {
-    pub fn add(self: *@This()) void { self.emit_byte(OP_ADD); }
-    pub fn func(self: *@This(), name: []const u8) void {
-        self.emit_byte(OP_FUNC);
-        self.emit_string(name);
-    }
-};
-
-// LLVM IR
-pub const LlvmTarget = struct {
     pub fn add(self: *@This()) void {
-        self.emit("%{d} = add i32 %{d}, %{d}\n", .{...});
+        self.vtable.add(self);  // Call indirecto
     }
 };
+
+// Cada llamada: load vtable → load fn ptr → call
 ```
 
-### 4. Runtime (VM propia)
+### Comptime (rápido, como Bun)
 
 ```zig
-pub const VM = struct {
-    stack: [256]Value,
-    sp: u8 = 0,
-    code: []const u8,
-    ip: usize = 0,
-    globals: std.StringHashMap(Value),
+// Static dispatch - RÁPIDO
+pub fn Emitter(comptime Target: type) type {
+    return struct {
+        target: Target,
 
-    pub fn run(self: *VM) !Value {
-        while (self.ip < self.code.len) {
-            const op = self.code[self.ip];
-            self.ip += 1;
+        pub inline fn add(self: *@This()) void {
+            self.target.add();  // Inline directo
+        }
+    };
+}
 
-            switch (op) {
-                OP_CONST => self.push(self.readConst()),
-                OP_ADD => self.push(self.pop() + self.pop()),
-                OP_SUB => { const b = self.pop(); self.push(self.pop() - b); },
-                OP_MUL => self.push(self.pop() * self.pop()),
-                OP_DIV => { const b = self.pop(); self.push(self.pop() / b); },
-                OP_CALL => self.call(self.readString()),
-                OP_RET => return self.pop(),
-                OP_LOCAL_GET => self.push(self.locals[self.readByte()]),
-                OP_LOCAL_SET => self.locals[self.readByte()] = self.pop(),
-                OP_JMP => self.ip = self.readU16(),
-                OP_JMP_IF_FALSE => {
-                    const addr = self.readU16();
-                    if (!self.pop().toBool()) self.ip = addr;
-                },
-                else => {},
+// Cada llamada: código inline, sin indirección
+```
+
+## Tamaño del Binario
+
+```
+Configuración: Lua → WAT (sin VM)
+├── Lexer Lua:     ~2KB
+├── Parser Lua:    ~4KB
+├── Emitter WAT:   ~3KB
+└── Total:         ~9KB
+
+Configuración: Lua + Python → WAT + JS + VM
+├── Lexer Lua:     ~2KB
+├── Lexer Python:  ~3KB
+├── Parser Lua:    ~4KB
+├── Parser Python: ~5KB
+├── Emitter WAT:   ~3KB
+├── Emitter JS:    ~3KB
+├── VM:            ~8KB
+└── Total:         ~28KB
+
+// Código no usado = no existe en binario
+```
+
+## Pipeline Comptime
+
+```zig
+// Pipeline especializado generado en comptime
+pub fn Pipeline(comptime config: Config) type {
+    return struct {
+        // Solo campos necesarios
+        lexer: if (config.needs_lexer) Lexer(config.lang) else void,
+        parser: if (config.needs_parser) Parser(config.lang) else void,
+        emitter: if (config.needs_emit) Emitter(config.target) else void,
+        vm: if (config.needs_vm) VM else void,
+
+        pub fn run(self: *@This(), source: []const u8) !Result {
+            // Código especializado, sin branches innecesarios
+            if (config.needs_lexer) {
+                const tokens = self.lexer.lex(source);
+                if (config.needs_parser) {
+                    const ast = self.parser.parse(tokens);
+                    if (config.needs_emit) {
+                        return self.emitter.emit(ast);
+                    }
+                    if (config.needs_vm) {
+                        return self.vm.run(ast);
+                    }
+                }
             }
         }
-        return self.pop();
-    }
-};
-```
-
-## Flujo Completo
-
-```
-                    ┌─────────────┐
-                    │   Source    │
-                    │  (.lua/.py) │
-                    └──────┬──────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────┐
-│                      FRONTEND                            │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐              │
-│  │ Lexer   │───▶│ Parser  │───▶│   AST   │              │
-│  │(template)│   │(template)│   │         │              │
-│  └─────────┘    └─────────┘    └─────────┘              │
-└──────────────────────────┬───────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────┐
-│                      MIDDLE                              │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐              │
-│  │Validate │───▶│Transform│───▶│Optimize │              │
-│  │(optional)│   │(optional)│   │(optional)│             │
-│  └─────────┘    └─────────┘    └─────────┘              │
-└──────────────────────────┬───────────────────────────────┘
-                           │
-                           ▼
-┌──────────────────────────────────────────────────────────┐
-│                      BACKEND                             │
-│            ┌─────────────┴─────────────┐                 │
-│            ▼                           ▼                 │
-│     ┌─────────────┐             ┌─────────────┐         │
-│     │   COMPILE   │             │  INTERPRET  │         │
-│     └──────┬──────┘             └──────┬──────┘         │
-│            │                           │                 │
-│     ┌──────┴──────┐                    ▼                 │
-│     ▼      ▼      ▼             ┌─────────────┐         │
-│   WAT    JS    LLVM            │     VM      │         │
-│            │                    │   (stack)   │         │
-│            ▼                    └─────────────┘         │
-│     ┌─────────────┐                    │                 │
-│     │   Output    │                    ▼                 │
-│     │  (archivo)  │             ┌─────────────┐         │
-│     └─────────────┘             │   Result    │         │
-│                                 └─────────────┘         │
-└──────────────────────────────────────────────────────────┘
+    };
+}
 ```
 
 ## API Final
 
 ```zig
+// main.zig del usuario
 const zid = @import("zid");
 
-// Opción 1: Compilar a WAT
-const wat = zid.compile(.{
-    .source = source,
+// Tipo especializado en comptime
+const Compiler = zid.Compiler(.{
     .lang = .lua,
     .target = .wat,
 });
-try std.fs.writeFile("out.wat", wat);
 
-// Opción 2: Compilar a JS
-const js = zid.compile(.{
-    .source = source,
-    .lang = .lua,
-    .target = .javascript,
-});
-
-// Opción 3: Ejecutar directamente
-const result = zid.run(.{
-    .source = source,
-    .lang = .lua,
-});
-std.debug.print("Result: {}\n", .{result});
-
-// Opción 4: Compilar a bytecode + ejecutar
-const bytecode = zid.compile(.{
-    .source = source,
-    .lang = .lua,
-    .target = .bytecode,
-});
-var vm = zid.VM.init(bytecode);
-const result2 = try vm.run();
-
-// Opción 5: Pipeline custom
-const result3 = zid.pipeline(.{
-    .source = source,
-    .steps = .{
-        .{ .lex, lua.tokens },
-        .{ .parse, lua.grammar },
-        .{ .validate, my_rules },      // opcional
-        .{ .transform, my_optimizer }, // opcional
-        .{ .emit, .wat },
-    },
-});
+pub fn main() !void {
+    var compiler = Compiler.init(allocator);
+    const wat = try compiler.compile(source);
+    // wat es []const u8 listo para escribir
+}
 ```
 
-## Estructura de Archivos
+## Build Configurations
+
+```zig
+// build.zig
+const std = @import("std");
+
+pub fn build(b: *std.Build) void {
+    // Transpilador Lua → WAT
+    _ = addZid(b, "lua2wat", .{ .lang = .lua, .target = .wat });
+
+    // Transpilador Python → JS
+    _ = addZid(b, "py2js", .{ .lang = .python, .target = .js });
+
+    // Intérprete Lua con VM
+    _ = addZid(b, "lua_vm", .{ .lang = .lua, .target = .bytecode, .vm = true });
+
+    // Multi-lenguaje (binario más grande)
+    _ = addZid(b, "multi", .{
+        .langs = &.{ .lua, .python, .lisp },
+        .targets = &.{ .wat, .js },
+        .vm = true,
+    });
+}
+
+fn addZid(b: *std.Build, name: []const u8, config: Config) *std.Build.Step.Compile {
+    const exe = b.addExecutable(.{ .name = name, ... });
+
+    const options = b.addOptions();
+    inline for (std.meta.fields(Config)) |field| {
+        options.addOption(field.type, field.name, @field(config, field.name));
+    }
+    exe.addOptions("config", options);
+
+    return exe;
+}
+```
+
+## Estructura Final
 
 ```
 zid/
 ├── src/
+│   ├── zid.zig              # Entry point con comptime switch
+│   │
 │   ├── core/
-│   │   ├── op.zig          # Op genérico
-│   │   ├── value.zig       # Tipos de valor
-│   │   └── error.zig       # Errores
+│   │   ├── op.zig           # Op(comptime Target) - inline
+│   │   ├── value.zig        # Tagged union optimizado
+│   │   └── ast.zig          # AST compacto
 │   │
-│   ├── frontend/
-│   │   ├── lexer.zig       # Lexer genérico
-│   │   ├── parser.zig      # Parser genérico
-│   │   └── ast.zig         # AST genérico
+│   ├── langs/               # Cada lang = módulo independiente
+│   │   ├── lua/
+│   │   │   ├── lexer.zig    # Lexer especializado Lua
+│   │   │   ├── parser.zig   # Parser especializado Lua
+│   │   │   └── keywords.zig # ComptimeStringMap
+│   │   ├── python/
+│   │   └── lisp/
 │   │
-│   ├── backend/
-│   │   ├── vm.zig          # VM con stack
-│   │   ├── compiler.zig    # AST → Bytecode
-│   │   └── targets/
-│   │       ├── wat.zig
-│   │       ├── js.zig
-│   │       ├── llvm.zig
-│   │       └── bytecode.zig
+│   ├── targets/             # Cada target = módulo independiente
+│   │   ├── wat.zig
+│   │   ├── js.zig
+│   │   ├── bytecode.zig
+│   │   └── llvm.zig
 │   │
-│   ├── langs/              # Templates por lenguaje
-│   │   ├── lua.zig
-│   │   ├── python.zig
-│   │   └── lisp.zig
-│   │
-│   └── main.zig
+│   └── runtime/             # Solo si vm = true
+│       └── vm.zig
 │
-├── examples/
-│   ├── lua_to_wat.zig
-│   ├── python_to_js.zig
-│   └── custom_lang.zig
-│
-└── build.zig
+└── build.zig                # Configuración comptime
 ```
 
-## Métricas Objetivo
+## Métricas
 
-| Componente | Líneas | Estado |
-|------------|--------|--------|
-| Core (Op, Value, Error) | ~200 | ✅ Proto |
-| Frontend (Lexer, Parser) | ~300 | ✅ Proto |
-| VM | ~150 | Pendiente |
-| Target WAT | ~100 | ✅ Proto |
-| Target JS | ~100 | Pendiente |
-| Target Bytecode | ~100 | Pendiente |
-| Lang Lua | ~100 | ✅ Proto |
-| Lang Python | ~100 | Pendiente |
-| **Total** | **~1,200** | ~40% |
+| Config | Código Compilado | Binario |
+|--------|-----------------|---------|
+| lua → wat | ~400 líneas | ~9KB |
+| lua → wat + vm | ~550 líneas | ~17KB |
+| lua + python → wat + js | ~700 líneas | ~25KB |
+| todo | ~1,200 líneas | ~40KB |
 
 ## vs Bun
 
-| | Bun | Zid |
-|--|-----|-----|
-| Líneas | ~850,000 | ~1,200 |
-| Lenguajes | JS/TS fijo | Cualquiera (templates) |
-| Targets | JS (JSC) | WAT, JS, Bytecode, LLVM |
-| Runtime | JSC | VM propia + compilación |
-| Extensible | Plugins limitados | Todo es plugin |
-| Propósito | Producción | Aprendizaje + DSLs |
+| Aspecto | Bun | Zid |
+|---------|-----|-----|
+| Dispatch | Static (comptime) | Static (comptime) |
+| Código no usado | No existe | No existe |
+| Vtables | No | No |
+| Inline | Sí | Sí |
+| Perfect hash | Sí (keywords) | Sí (keywords) |
+| Tamaño | ~15MB (todo) | ~9KB-40KB (configurable) |
+
+**Mismo patrón que Bun**: comptime genera código especializado, sin overhead de runtime.
