@@ -9,6 +9,9 @@ const lua_lift = @import("../lift/lua.zig");
 // Lowers (IR → Target)
 const wat_lower = @import("../lower/wat.zig");
 
+// Language capabilities
+const capabilities = @import("../lang/capabilities.zig");
+
 const Type = types.Type;
 const Node = nodes.Node;
 const Builder = builder.Builder;
@@ -60,6 +63,19 @@ pub const Pipeline = struct {
         lang: []const u8,
         target: []const u8,
     ) ![]const u8 {
+        // Step 0: Check capability compatibility
+        const compat = try self.checkCompatibility(lang, target);
+        if (!compat.isCompatible()) {
+            for (compat.errors.slice()) |err| {
+                try self.report(.error_, err);
+            }
+            return error.IncompatibleLanguages;
+        }
+        // Log warnings
+        for (compat.warnings.slice()) |warn| {
+            try self.report(.warning, warn);
+        }
+
         // Step 1: Parse source to AST
         const ast = try self.parse(source, lang);
 
@@ -73,6 +89,19 @@ pub const Pipeline = struct {
 
         // Step 4: Lower IR to target
         return self.lower(ir, target);
+    }
+
+    /// Check if source language can be transpiled to target
+    fn checkCompatibility(self: *Pipeline, lang: []const u8, target: []const u8) !capabilities.CompatResult {
+        _ = self;
+        const source_caps = capabilities.get(lang) orelse return capabilities.CompatResult{};
+        const target_caps = capabilities.get(target) orelse return capabilities.CompatResult{};
+        return source_caps.canTranspileTo(target_caps);
+    }
+
+    /// Get capabilities for a language
+    pub fn getCapabilities(lang: []const u8) ?capabilities.Capabilities {
+        return capabilities.get(lang);
     }
 
     /// Parse source to language-specific AST
