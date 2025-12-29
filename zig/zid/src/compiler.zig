@@ -9,6 +9,9 @@ const rust_parser = @import("builtin/rust/parser.zig");
 const wat_emitter = @import("builtin/wat/emitter.zig");
 const rust_emitter = @import("builtin/rust/emitter.zig");
 
+// IR Pipeline (new architecture)
+const ir_pipeline = @import("ir/pipeline.zig");
+
 pub fn compileFile(alloc: std.mem.Allocator, file_path: []const u8, target_override: ?[]const u8) ![]const u8 {
     // Read source file
     const file = try std.fs.cwd().openFile(file_path, .{});
@@ -25,7 +28,22 @@ pub fn compileFile(alloc: std.mem.Allocator, file_path: []const u8, target_overr
     return compile(alloc, source, lang, target);
 }
 
+pub const CompileMode = enum {
+    direct, // Direct AST → Target (legacy, faster for simple cases)
+    ir, // AST → IR → Target (new, preserves semantics for complex transpilation)
+};
+
 pub fn compile(alloc: std.mem.Allocator, source: []const u8, lang: []const u8, target: []const u8) ![]const u8 {
+    return compileWithMode(alloc, source, lang, target, .direct);
+}
+
+pub fn compileWithMode(alloc: std.mem.Allocator, source: []const u8, lang: []const u8, target: []const u8, mode: CompileMode) ![]const u8 {
+    // IR Pipeline mode - preserves semantics, supports transforms
+    if (mode == .ir) {
+        return compileViaIR(alloc, source, lang, target);
+    }
+
+    // Direct mode - fast path for simple transpilation
     // Lua -> WAT
     if (std.mem.eql(u8, lang, "lua") and std.mem.eql(u8, target, "wat")) {
         return compileLuaToWat(alloc, source);
@@ -46,8 +64,18 @@ pub fn compile(alloc: std.mem.Allocator, source: []const u8, lang: []const u8, t
         return compileRustToRust(alloc, source);
     }
 
-    std.debug.print("No compiler available for {s} -> {s}\n", .{ lang, target });
-    return error.NoCompilerAvailable;
+    // Try IR pipeline as fallback
+    return compileViaIR(alloc, source, lang, target);
+}
+
+fn compileViaIR(alloc: std.mem.Allocator, source: []const u8, lang: []const u8, target: []const u8) ![]const u8 {
+    var pipeline = ir_pipeline.Pipeline.init(alloc);
+    defer pipeline.deinit();
+
+    // Add optimization transforms
+    try pipeline.addTransform(ir_pipeline.constantFolding);
+
+    return pipeline.compile(source, lang, target);
 }
 
 fn compileLuaToWat(alloc: std.mem.Allocator, source: []const u8) ![]const u8 {
