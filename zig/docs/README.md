@@ -1,38 +1,40 @@
 # Zid
 
-Templates + Engine. Simple.
+Templates + Op + Engine.
+
+## Estructura
 
 ```
-Templates (datos)  →  Engine (fijo)  →  Output
+proto/
+├── templates.zig   # Datos: tokens, nodes
+├── engine.zig      # Lexer, Parser, Op, Emitter
+└── main.zig        # compile(source) → wat
 ```
 
-## Estructuras
+## Op Helper
 
 ```zig
-// Data: envuelve valor
-const data = Data.of(source).map(lex).map(parse).map(emit);
-
-// Validator: opcional, simple condición
-if (!validator.check(tokens)) return error;
-
-// Compose: pipeline de funciones
-const run = compose(lex, parse, emit);
-const output = run(source);
+// Cada opcode = 1 método
+self.op.module();
+self.op.func("add", params);
+self.op.block("break");
+self.op.loop("continue");
+self.op.i32_const("42");
+self.op.i32_add();
+self.op.local_get("x");
+self.op.br_if("break");
+self.op.end();
 ```
 
-## Proto: Lua → WAT
-
-Ver `proto/` para ejemplo funcional.
+## Ejemplo
 
 ```lua
--- input.lua
 function add(a, b)
     return a + b
 end
 ```
 
 ```wat
-;; output.wat
 (module
   (func $add (param $a i32) (param $b i32) (result i32)
     local.get $a
@@ -42,3 +44,7 @@ end
   (export "add" (func $add))
 )
 ```
+
+## Bun VM vs Zid
+
+Ver comparación detallada abajo.
