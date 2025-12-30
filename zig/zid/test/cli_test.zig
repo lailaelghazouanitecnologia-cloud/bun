@@ -32,14 +32,14 @@ test "parse new commands" {
     try testing.expectEqual(cli.Command.update, cli.Command.parse("update").?);
     try testing.expectEqual(cli.Command.update, cli.Command.parse("upgrade").?);
 
-    // Patch commands
-    try testing.expectEqual(cli.Command.patch, cli.Command.parse("patch").?);
+    // Note: patch is not a CLI command - it runs automatically at startup
 }
 
 test "all commands exist" {
     const cli = @import("../src/cli.zig");
 
     // Verify all enum variants can be parsed
+    // Note: patch removed - it's auto-run at startup for security
     const commands = [_][]const u8{
         "install",
         "uninstall",
@@ -53,7 +53,6 @@ test "all commands exist" {
         "watch",
         "help",
         "update",
-        "patch",
     };
 
     for (commands) |cmd| {

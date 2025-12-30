@@ -16,8 +16,12 @@ pub const HelpCommand = @import("cli/help.zig");
 // Subsystems
 const toolchain = @import("toolchain/toolchain.zig");
 const apps = @import("apps/apps.zig");
+const patches = @import("patches/patches.zig");
 
 pub fn run(alloc: std.mem.Allocator) !void {
+    // Auto-check for security patches at startup (silent)
+    checkPatches(alloc);
+
     const args = try std.process.argsAlloc(alloc);
     defer std.process.argsFree(alloc, args);
 
@@ -72,7 +76,6 @@ pub const Command = enum {
     // Meta
     help,
     update,
-    patch,
 
     pub fn parse(s: []const u8) ?Command {
         const map = std.StaticStringMap(Command).initComptime(.{
@@ -96,7 +99,6 @@ pub const Command = enum {
             .{ "help", .help },
             .{ "update", .update },
             .{ "upgrade", .update },
-            .{ "patch", .patch },
         });
         return map.get(s);
     }
@@ -115,7 +117,26 @@ pub const Command = enum {
             .watch => BuildCommand.runWatch(alloc, args),
             .help => HelpCommand.run(alloc, args),
             .update => @import("cli/update.zig").run(alloc, args),
-            .patch => @import("cli/patch.zig").run(alloc, args),
         }
     }
 };
+
+// ============ INTERNAL ============
+
+/// Check for security patches at startup (runs silently)
+fn checkPatches(alloc: std.mem.Allocator) void {
+    // Only check critical patches silently
+    switch (patches.check(alloc)) {
+        .ok => |pending| {
+            for (pending) |patch| {
+                if (patch.severity == .critical) {
+                    // Auto-apply critical security patches
+                    var mgr = patches.Manager.init(alloc);
+                    defer mgr.deinit();
+                    _ = mgr.apply(patch);
+                }
+            }
+        },
+        .err => {}, // Silently ignore network errors
+    }
+}
