@@ -125,8 +125,9 @@ pub fn PlatformString(
     comptime posix_name: ?[]const u8,
     comptime windows_name: ?[]const u8,
 ) Variable(.string, []const u8) {
+    const name = if (posix_name) |pn| pn else if (windows_name) |wn| wn else "";
     return .{
-        .name = posix_name orelse windows_name orelse "",
+        .name = name,
         .posix_name = posix_name,
         .windows_name = windows_name,
         .default = null,
@@ -258,15 +259,14 @@ pub fn getZidHome() []const u8 {
 
 /// Check if running in CI
 pub fn isCI() bool {
-    return CI.get() orelse
-        GITHUB_ACTIONS.get() orelse
-        GITLAB_CI.get() orelse
-        CIRCLECI.get() orelse
-        TRAVIS.get() orelse
-        TF_BUILD.get() orelse
-        BUILDKITE.get() orelse
-        JENKINS_URL.isSet() orelse
-        false;
+    return (CI.get() orelse false) or
+        (GITHUB_ACTIONS.get() orelse false) or
+        (GITLAB_CI.get() orelse false) or
+        (CIRCLECI.get() orelse false) or
+        (TRAVIS.get() orelse false) or
+        (TF_BUILD.get() orelse false) or
+        (BUILDKITE.get() orelse false) or
+        JENKINS_URL.isSet();
 }
 
 /// Get CI name if detected

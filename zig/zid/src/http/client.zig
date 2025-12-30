@@ -406,12 +406,24 @@ pub const Url = struct {
 
     pub fn parse(url: []const u8) ?Url {
         const uri = Uri.parse(url) catch return null;
+        const host_str = if (uri.host) |h| switch (h) {
+            .raw => |r| r,
+            .percent_encoded => |p| p,
+        } else return null;
+        const path_str = switch (uri.path) {
+            .raw => |r| if (r.len > 0) r else "/",
+            .percent_encoded => |p| if (p.len > 0) p else "/",
+        };
+        const query_str = if (uri.query) |q| switch (q) {
+            .raw => |r| r,
+            .percent_encoded => |p| p,
+        } else null;
         return .{
-            .scheme = if (uri.scheme) |s| s else "https",
-            .host = if (uri.host) |h| h.raw else return null,
+            .scheme = if (uri.scheme.len > 0) uri.scheme else "https",
+            .host = host_str,
             .port = uri.port,
-            .path = if (uri.path.raw.len > 0) uri.path.raw else "/",
-            .query = if (uri.query) |q| q.raw else null,
+            .path = path_str,
+            .query = query_str,
         };
     }
 

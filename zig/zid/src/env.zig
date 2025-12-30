@@ -283,7 +283,8 @@ pub fn isCI() bool {
 pub fn isDocker() bool {
     if (!isLinux) return false;
     // Check for /.dockerenv file
-    return std.fs.accessAbsolute("/.dockerenv", .{}) catch false;
+    std.fs.accessAbsolute("/.dockerenv", .{}) catch return false;
+    return true;
 }
 
 pub fn isWSL() bool {
@@ -296,7 +297,8 @@ pub fn isWSL() bool {
 
 pub fn isNixOS() bool {
     if (!isLinux) return false;
-    return std.fs.accessAbsolute("/etc/NIXOS", .{}) catch false;
+    std.fs.accessAbsolute("/etc/NIXOS", .{}) catch return false;
+    return true;
 }
 
 // ============ PLATFORM STRINGS ============
