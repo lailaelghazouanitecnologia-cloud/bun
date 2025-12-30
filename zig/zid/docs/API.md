@@ -23,10 +23,10 @@ pub fn main() !void {
 |--------|-------------|
 | `zid.api.fs` | Filesystem: read, write, copy, mkdir, stat |
 | `zid.api.shell` | Shell: exec, hasCommand, getEnv |
-| `zid.api.http` | HTTP: get, post, download |
 | `zid.api.search` | Search: glob, grep, find |
 | `zid.api.template` | Templates: list, findBuiltin, create |
 | `zid.api.json` | JSON: parse, stringify |
+| `zid.http` | HTTP client: get, post, download con progress |
 
 ---
 
@@ -280,9 +280,30 @@ pub fn getEnv(key: []const u8) ?[]const u8
 
 ---
 
-## zid.api.http
+## zid.http
 
-Cliente HTTP.
+Cliente HTTP con soporte para downloads y progress tracking.
+
+### Client
+
+```zig
+pub const Client = struct {
+    allocator: Allocator,
+    default_timeout_ms: u32,
+    user_agent: []const u8,
+
+    pub fn init(allocator: Allocator) Client;
+    pub fn get(self: *Self, url: []const u8) Maybe(Response);
+    pub fn post(self: *Self, url: []const u8, body: []const u8) Maybe(Response);
+    pub fn download(
+        self: *Self,
+        url: []const u8,
+        dest_path: []const u8,
+        progress: ?*Progress,
+        options: DownloadOptions,
+    ) Maybe(void);
+};
+```
 
 ### Response
 
@@ -290,53 +311,84 @@ Cliente HTTP.
 pub const Response = struct {
     status: u16,
     body: []const u8,
-    headers: []const Header,
 
     pub fn ok(self: Response) bool;  // status 200-299
 };
+```
 
-pub const Header = struct {
-    name: []const u8,
-    value: []const u8,
+### Progress
+
+Tracking de progreso para downloads.
+
+```zig
+pub const Progress = struct {
+    total: u64 = 0,
+    current: u64 = 0,
+    callback: ?*const fn (current: u64, total: u64, userdata: ?*anyopaque) void = null,
+    userdata: ?*anyopaque = null,
+
+    pub fn update(self: *Progress, bytes: u64) void;
+    pub fn percent(self: Progress) u8;
+    pub fn reset(self: *Progress) void;
 };
 ```
 
-### get
-
-HTTP GET request.
-
+**Ejemplo con progress bar:**
 ```zig
-pub fn get(allocator: Allocator, url: []const u8) !Response
-```
-
-**Ejemplo:**
-```zig
-const resp = try zid.api.http.get(allocator, "https://api.example.com/data");
-if (resp.ok()) {
-    std.debug.print("Body: {s}\n", .{resp.body});
+fn printProgress(current: u64, total: u64, _: ?*anyopaque) void {
+    const pct = if (total > 0) (current * 100) / total else 0;
+    std.debug.print("\rDownloading: {}%", .{pct});
 }
-```
 
-### post
-
-HTTP POST request.
-
-```zig
-pub fn post(allocator: Allocator, url: []const u8, body: []const u8) !Response
-```
-
-### Method
-
-```zig
-pub const Method = enum {
-    GET,
-    POST,
-    PUT,
-    DELETE,
-    PATCH,
-    HEAD,
-    OPTIONS,
+var progress = zid.http.Progress{
+    .callback = printProgress,
 };
+
+var client = zid.http.Client.init(allocator);
+_ = client.download(url, "/tmp/file.tar.gz", &progress, .{});
+```
+
+### Url
+
+Parsing de URLs.
+
+```zig
+pub const Url = struct {
+    scheme: []const u8,
+    host: []const u8,
+    port: ?u16,
+    path: []const u8,
+    query: ?[]const u8,
+
+    pub fn parse(url: []const u8) ?Url;
+    pub fn isHttps(self: Url) bool;
+};
+```
+
+### Funciones de conveniencia
+
+```zig
+// GET simple (sin crear Client)
+pub fn get(allocator: Allocator, url: []const u8) Maybe(Response);
+
+// POST simple
+pub fn post(allocator: Allocator, url: []const u8, body: []const u8) Maybe(Response);
+
+// Download directo
+pub fn download(
+    allocator: Allocator,
+    url: []const u8,
+    dest_path: []const u8,
+    progress: ?*Progress,
+) Maybe(void);
+```
+
+**Ejemplo GET:**
+```zig
+switch (zid.http.get(allocator, "https://api.example.com/data")) {
+    .ok => |r| std.debug.print("Body: {s}\n", .{r.body}),
+    .err => |e| e.print(),
+}
 ```
 
 ---

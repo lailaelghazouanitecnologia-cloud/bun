@@ -20,6 +20,12 @@ test/
 │   ├── custom_toolchain_test.zig  # Custom toolchains JSON
 │   └── api_test.zig           # API module tests
 │
+├── examples/                  # Ejemplos prácticos de uso
+│   ├── download_tool.zig      # Progress bar y URL parsing
+│   ├── environment.zig        # Detección de plataforma/CI
+│   ├── file_operations.zig    # Operaciones con sys.zig
+│   └── toolchain_info.zig     # Versiones y registry info
+│
 ├── toolchain_test.zig         # Toolchain system
 ├── capsules_test.zig          # Capsules system
 ├── patches_test.zig           # Patches system
@@ -112,6 +118,22 @@ test/
 | command parsing | help, install, add, etc. |
 | help flags | -h, --help |
 | version flags | -v, --version |
+
+### Examples (test/examples/)
+
+Ejemplos prácticos que demuestran uso real de la API:
+
+| Archivo | Descripción |
+|---------|-------------|
+| `download_tool.zig` | Progress bar, URL parsing, platform detection |
+| `environment.zig` | Detección de plataforma (Linux/macOS/Windows), CI, env vars |
+| `file_operations.zig` | sys.zig: stat, mkdir, read/write files |
+| `toolchain_info.zig` | Version parsing, comparison, constraints, registry |
+
+```bash
+# Ejecutar solo ejemplos
+zig build test -- --test-filter "example:"
+```
 
 ## Principios de Testing
 

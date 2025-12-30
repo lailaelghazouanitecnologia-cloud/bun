@@ -21,12 +21,12 @@ Zid sigue patrones de diseño inspirados en Bun: un binario monolítico, orienta
 │                     │   (Maybe, Dispatch, etc)   │                           │
 │                     └─────────────┬─────────────┘                            │
 │                                   │                                          │
-│        ┌─────────────────┬────────┴────────┬─────────────────┐               │
-│        │                 │                 │                 │               │
-│  ┌─────▼─────┐    ┌──────▼──────┐   ┌──────▼──────┐   ┌──────▼──────┐       │
-│  │  Output   │    │   Strings   │   │     FS      │   │ Environment │       │
-│  │ (colors)  │    │ (utilities) │   │ (filesystem)│   │  (platform) │       │
-│  └───────────┘    └─────────────┘   └─────────────┘   └─────────────┘       │
+│     ┌─────────────┬───────────────┼───────────────┬─────────────┐            │
+│     │             │               │               │             │            │
+│  ┌──▼───┐   ┌─────▼─────┐   ┌─────▼─────┐   ┌─────▼─────┐  ┌────▼────┐      │
+│  │Output│   │  Strings  │   │    FS     │   │Environment│  │  HTTP   │      │
+│  │colors│   │ utilities │   │filesystem │   │ platform  │  │ client  │      │
+│  └──────┘   └───────────┘   └───────────┘   └───────────┘  └─────────┘      │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -240,7 +240,36 @@ patches/
 2. Si hay patches pendientes, los aplica
 3. Registra en `~/.zid/patches/applied.json`
 
-### 7. API Module (`api/`)
+### 7. HTTP Client (`http/`)
+
+Cliente HTTP simple para downloads:
+
+```
+http/
+├── http.zig        # Re-exports
+└── client.zig      # HTTP client wrapper
+```
+
+```zig
+const http = zid.http;
+
+// GET request
+const response = try http.get(allocator, "https://api.example.com/data");
+
+// Download con progress
+var progress = http.Progress{
+    .total = 0,
+    .callback = myProgressCallback,
+};
+try http.download(allocator, url, "/path/to/file", &progress, .{});
+
+// URL parsing
+const parsed = http.Url.parse("https://example.com/path");
+```
+
+**Nota:** Zid NO usa µWebSockets ni libuv. Para un CLI tool, `std.http.Client` es suficiente.
+
+### 8. API Module (`api/`)
 
 API pública para scripts Zig:
 
@@ -267,7 +296,7 @@ pub fn main() !void {
 }
 ```
 
-### 8. Framework (`framework/`)
+### 9. Framework (`framework/`)
 
 API para crear transpilers:
 
