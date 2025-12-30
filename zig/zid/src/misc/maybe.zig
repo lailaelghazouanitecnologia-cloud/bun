@@ -71,37 +71,61 @@ pub const Error = struct {
 
     pub const Code = enum(u16) {
         ok = 0,
-        // System
+        // System errors (1-49)
         not_found = 1,
         permission_denied = 2,
         io_error = 3,
         out_of_memory = 4,
-        // Parse
+        already_exists = 5,
+        is_directory = 6,
+        not_directory = 7,
+        no_space = 8,
+        interrupted = 9,
+        busy = 10,
+        broken_pipe = 11,
+        would_block = 12,
+        timeout = 13,
+        // Parse errors (100-149)
         syntax_error = 100,
         unexpected_token = 101,
         invalid_utf8 = 102,
         parse_error = 103,
         invalid_input = 104,
-        // Network
+        // Network errors (150-199)
         network_error = 150,
-        // Toolchain
+        connection_refused = 151,
+        connection_reset = 152,
+        host_not_found = 153,
+        // Toolchain errors (200-249)
         tool_not_found = 200,
         version_not_found = 201,
         download_failed = 202,
-        // App
+        extract_failed = 203,
+        verify_failed = 204,
+        // App errors (300-349)
         app_not_found = 300,
         build_failed = 301,
-        // Generic
+        // Generic (900+)
         internal_error = 998,
         unknown = 999,
     };
 
     pub const Step = enum {
         unknown,
-        // IO
+        // File IO
+        open_file,
+        close_file,
         read_file,
         write_file,
+        stat_file,
+        // Directory
         open_dir,
+        create_dir,
+        delete,
+        rename,
+        symlink,
+        chmod,
+        resolve_path,
         // Parse
         lex,
         parse,
@@ -111,6 +135,8 @@ pub const Error = struct {
         compile,
         link,
         // Network
+        connect,
+        bind,
         network,
         download,
         extract,

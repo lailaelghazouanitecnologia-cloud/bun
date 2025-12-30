@@ -64,6 +64,15 @@ pub const Output = @import("output.zig");
 pub const strings = @import("strings.zig");
 pub const fs = @import("fs.zig");
 
+// System abstraction (inspired by Bun's sys.zig)
+pub const sys = @import("sys.zig");
+
+// Type-safe environment variables
+pub const env_var = @import("env_var.zig");
+
+// Feature flags (compile-time and runtime)
+pub const feature_flags = @import("feature_flags.zig");
+
 // ============ SUBSYSTEMS ============
 
 pub const cli = @import("cli.zig");
