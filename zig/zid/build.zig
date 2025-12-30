@@ -47,6 +47,8 @@ pub fn build(b: *std.Build) void {
         "test/toolchain_test.zig",
         "test/update_test.zig",
         "test/misc_test.zig",
+        "test/apps_test.zig",
+        "test/framework_test.zig",
     };
 
     for (test_files) |test_file| {

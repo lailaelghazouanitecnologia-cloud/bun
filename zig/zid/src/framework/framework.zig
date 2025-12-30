@@ -1,12 +1,47 @@
 //! Transpiler Framework
 //!
-//! API for building transpilers.
+//! API for building transpilers. Provides:
+//! - Pipeline: Multi-stage transformation chain
+//! - IR: Intermediate representation for AST/code
+//! - Metadata: Project configuration
+//!
+//! Quick Start:
+//! ```zig
+//! const zid = @import("zid");
+//!
+//! pub const pipeline = zid.Pipeline{
+//!     .name = "my-transpiler",
+//!     .input = "src/*.mylang",
+//!     .stages = &.{
+//!         .{ .name = "parse", .run = parse },
+//!         .{ .name = "emit", .run = emit },
+//!     },
+//! };
+//! ```
 
 const std = @import("std");
 const Output = @import("../output.zig");
 const fs = @import("../fs.zig");
 
-pub const Pipeline = @import("pipeline.zig").Pipeline;
+// Re-export pipeline components
+const pipeline = @import("pipeline.zig");
+pub const Pipeline = pipeline.Pipeline;
+pub const Stage = pipeline.Stage;
+pub const StageContext = pipeline.StageContext;
+pub const debugStage = pipeline.debugStage;
+pub const identityStage = pipeline.identityStage;
+
+// Re-export IR components
+pub const ir = @import("ir.zig");
+pub const IR = ir;
+pub const Builder = ir.Builder;
+pub const Node = ir.Node;
+pub const NodeRef = ir.NodeRef;
+pub const Location = ir.Location;
+pub const Type = ir.Type;
+pub const BinaryOp = ir.BinaryOp;
+pub const UnaryOp = ir.UnaryOp;
+
 pub const Metadata = @import("metadata.zig").Metadata;
 
 pub fn init(alloc: std.mem.Allocator, template: []const u8, name: []const u8) !void {

@@ -19,6 +19,7 @@ pub const fetcher = @import("fetcher.zig");
 pub const manifest = @import("manifest.zig");
 pub const integration = @import("integration.zig");
 pub const paths = @import("paths.zig");
+pub const shell = @import("shell.zig");
 
 // Re-export types
 pub const Capsule = registry.Capsule;
@@ -103,6 +104,9 @@ pub const Manager = struct {
             }
         };
 
+        // Auto-update shell environment
+        _ = shell.updateRc(self.allocator);
+
         Output.success("Installed {s}\n", .{cap.name});
 
         return zid.ok(Capsule, .{
@@ -137,6 +141,9 @@ pub const Manager = struct {
             .err => |e| return zid.err(Capsule, e),
         }
 
+        // Auto-update shell environment
+        _ = shell.updateRc(self.allocator);
+
         Output.success("Installed {s}@{s}\n", .{ name, mf.version });
 
         return zid.ok(Capsule, .{
@@ -161,6 +168,8 @@ pub const Manager = struct {
             std.fs.deleteTreeAbsolute(path) catch |e| {
                 return zid.fail(void, e, .write_file, path);
             };
+            // Auto-update shell environment
+            _ = shell.updateRc(self.allocator);
             Output.success("Removed {s}\n", .{name});
             return zid.ok(void, {});
         } else |_| {}
@@ -174,6 +183,9 @@ pub const Manager = struct {
         std.fs.deleteTreeAbsolute(path) catch |e| {
             return zid.fail(void, e, .write_file, path);
         };
+
+        // Auto-update shell environment
+        _ = shell.updateRc(self.allocator);
 
         Output.success("Removed {s}\n", .{name});
         return zid.ok(void, {});
