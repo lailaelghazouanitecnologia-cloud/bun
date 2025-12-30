@@ -1,7 +1,7 @@
 //! Toolchain Manager
 //!
 //! Install, manage, and switch between development tools.
-//! Supports: bun, zig, node, deno, go, rust
+//! Supports: bun, zig, node, deno, go, rust + custom toolchains
 
 const std = @import("std");
 const zid = @import("../zid.zig");
@@ -12,6 +12,8 @@ pub const registry = @import("registry.zig");
 pub const downloader = @import("downloader.zig");
 pub const extractor = @import("extractor.zig");
 pub const installer = @import("installer.zig");
+pub const resolver = @import("resolver.zig");
+pub const custom = @import("custom.zig");
 
 // Re-export key types
 pub const Version = versions.Version;
@@ -21,11 +23,20 @@ pub const ToolDef = registry.ToolDef;
 pub const ToolSpec = registry.ToolSpec;
 pub const Installer = installer.Installer;
 pub const InstallResult = installer.InstallResult;
+pub const CustomToolchain = custom.CustomToolchain;
 
 // ============ PUBLIC API ============
 
 /// Install a tool (e.g., "bun@1.1.0", "zig", "node@latest")
 pub fn install(allocator: std.mem.Allocator, spec: []const u8) zid.Maybe(InstallResult) {
+    // Check for conflicts
+    const at_pos = std.mem.indexOf(u8, spec, "@");
+    const name = if (at_pos) |p| spec[0..p] else spec;
+
+    if (resolver.detectConflict(allocator, name)) |conflict| {
+        resolver.warnConflict(conflict);
+    }
+
     return installer.install(allocator, spec);
 }
 
@@ -80,14 +91,36 @@ pub fn use(allocator: std.mem.Allocator, spec: []const u8) zid.Maybe(void) {
     return zid.ok(void, {});
 }
 
+/// Run a toolchain command
+pub fn run(allocator: std.mem.Allocator, name: []const u8, args: []const []const u8) !u8 {
+    return resolver.runToolchain(allocator, name, args);
+}
+
 /// Get list of supported tools
 pub fn supportedTools() []const ToolDef {
     return registry.listAll();
 }
 
-/// Check if a tool is supported
+/// Check if a tool is supported (builtin or custom)
 pub fn isSupported(name: []const u8) bool {
-    return registry.getByName(name) != null;
+    // Check builtin
+    if (registry.getByName(name) != null) return true;
+    // Check custom
+    if (custom.isCustom(std.heap.page_allocator, name)) return true;
+    return false;
+}
+
+/// Get toolchain definition (builtin or custom)
+pub fn getToolDef(allocator: std.mem.Allocator, name: []const u8) ?ToolDef {
+    // Check builtin first
+    if (registry.getByName(name)) |def| {
+        return def.*;
+    }
+    // Check custom
+    if (custom.getCustom(allocator, name)) |tc| {
+        return tc.toToolDef();
+    }
+    return null;
 }
 
 // ============ TESTS ============
@@ -98,4 +131,6 @@ test "toolchain exports" {
     _ = downloader;
     _ = extractor;
     _ = installer;
+    _ = resolver;
+    _ = custom;
 }
