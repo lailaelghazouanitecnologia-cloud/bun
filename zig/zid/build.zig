@@ -40,6 +40,7 @@ pub fn build(b: *std.Build) void {
 
     // Test files in test/
     const test_files = [_][]const u8{
+        // Existing tests
         "test/cli_test.zig",
         "test/strings_test.zig",
         "test/capsules_test.zig",
@@ -49,6 +50,12 @@ pub fn build(b: *std.Build) void {
         "test/misc_test.zig",
         "test/apps_test.zig",
         "test/framework_test.zig",
+        // Unit tests
+        "test/unit/versions_test.zig",
+        "test/unit/resolver_test.zig",
+        "test/unit/template_test.zig",
+        "test/unit/custom_toolchain_test.zig",
+        "test/unit/api_test.zig",
     };
 
     for (test_files) |test_file| {

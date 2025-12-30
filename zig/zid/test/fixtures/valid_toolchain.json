@@ -1,0 +1,17 @@
+{
+  "gleam": {
+    "description": "Gleam language",
+    "homepage": "https://gleam.run",
+    "url_template": "https://github.com/gleam-lang/gleam/releases/download/v{version}/gleam-v{version}-{arch}-unknown-{os}-musl.tar.gz",
+    "archive": "tar_gz",
+    "binary": "gleam"
+  },
+  "vlang": {
+    "description": "V programming language",
+    "homepage": "https://vlang.io",
+    "url_template": "https://github.com/vlang/v/releases/download/{version}/v_{os}.zip",
+    "archive": "zip",
+    "binary": "v",
+    "binary_path": "v"
+  }
+}
