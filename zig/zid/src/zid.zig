@@ -8,6 +8,26 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+// ============ MISC (Core Patterns) ============
+
+pub const misc = @import("misc/mod.zig");
+
+// Re-export key types at top level
+pub const Maybe = misc.Maybe;
+pub const Error = misc.Error;
+pub const Dispatch = misc.Dispatch;
+pub const StateMachine = misc.StateMachine;
+pub const bufs = misc.bufs;
+
+// Convenience functions
+pub const ok = misc.ok;
+pub const err = misc.err;
+pub const fail = misc.fail;
+
+// Collections
+pub const SmallList = misc.SmallList;
+pub const HivePool = misc.HivePool;
+
 // ============ CORE EXPORTS ============
 
 pub const Environment = @import("env.zig");
@@ -26,7 +46,7 @@ pub const framework = @import("framework/framework.zig");
 
 /// Default allocator for general use.
 /// In release: c_allocator for performance
-/// In debug: GeneralPurposeAllocator for leak detection
+/// In debug: page_allocator for debugging
 pub const default_allocator: std.mem.Allocator = if (Environment.isDebug)
     std.heap.page_allocator
 else
@@ -36,15 +56,6 @@ else
 pub fn arena() std.heap.ArenaAllocator {
     return std.heap.ArenaAllocator.init(default_allocator);
 }
-
-// ============ THREAD-LOCAL BUFFERS ============
-
-/// Thread-local path buffer for temporary path operations
-/// Avoids allocations for common operations (critical for performance)
-pub threadlocal var path_buf: [4096]u8 = undefined;
-
-/// Thread-local string buffer
-pub threadlocal var string_buf: [8192]u8 = undefined;
 
 // ============ VERSION ============
 
@@ -66,14 +77,13 @@ pub fn getHome() []const u8 {
     const home = std.posix.getenv("HOME") orelse
         if (Environment.isWindows) std.posix.getenv("USERPROFILE") orelse "." else "/tmp";
 
-    // Use threadlocal buffer
-    return std.fmt.bufPrint(&path_buf, "{s}/.zid", .{home}) catch ".zid";
+    return std.fmt.bufPrint(bufs.path(), "{s}/.zid", .{home}) catch ".zid";
 }
 
 /// Get bin directory (~/.zid/bin)
 pub fn getBinDir() []const u8 {
     const home = getHome();
-    return std.fmt.bufPrint(&path_buf, "{s}/bin", .{home}) catch "bin";
+    return std.fmt.bufPrint(bufs.path2(), "{s}/bin", .{home}) catch "bin";
 }
 
 // ============ PANIC HANDLER ============
@@ -90,4 +100,40 @@ pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_
     }
 
     std.debug.defaultPanic(msg, error_return_trace, ret_addr);
+}
+
+// ============ EXAMPLES ============
+
+/// Example: Using Maybe for error handling
+pub fn exampleMaybe() Maybe(i32) {
+    const result = std.fmt.parseInt(i32, "123", 10) catch |e| {
+        return fail(i32, e, .parse, "");
+    };
+    return ok(i32, result);
+}
+
+/// Example: Using dispatch
+pub fn exampleDispatch() void {
+    const TestOp = enum { add, sub, mul };
+
+    const Ctx = struct {
+        value: i32 = 0,
+
+        pub fn handle_add(self: *@This(), n: i32) !i32 {
+            self.value += n;
+            return self.value;
+        }
+        pub fn handle_sub(self: *@This(), n: i32) !i32 {
+            self.value -= n;
+            return self.value;
+        }
+        pub fn handle_mul(self: *@This(), n: i32) !i32 {
+            self.value *= n;
+            return self.value;
+        }
+    };
+
+    var ctx = Ctx{};
+    var vm = Dispatch(TestOp, Ctx, i32).init(&ctx);
+    _ = vm.exec(.add, 10);
 }
