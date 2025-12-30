@@ -20,3 +20,43 @@ test "parse command aliases" {
     try testing.expectEqual(cli.Command.init, cli.Command.parse("create").?);
     try testing.expectEqual(cli.Command.watch, cli.Command.parse("w").?);
 }
+
+test "parse new commands" {
+    const cli = @import("../src/cli.zig");
+
+    // Capsule commands
+    try testing.expectEqual(cli.Command.capsule, cli.Command.parse("capsule").?);
+    try testing.expectEqual(cli.Command.capsule, cli.Command.parse("cap").?);
+
+    // Update commands
+    try testing.expectEqual(cli.Command.update, cli.Command.parse("update").?);
+    try testing.expectEqual(cli.Command.update, cli.Command.parse("upgrade").?);
+
+    // Patch commands
+    try testing.expectEqual(cli.Command.patch, cli.Command.parse("patch").?);
+}
+
+test "all commands exist" {
+    const cli = @import("../src/cli.zig");
+
+    // Verify all enum variants can be parsed
+    const commands = [_][]const u8{
+        "install",
+        "uninstall",
+        "list",
+        "use",
+        "add",
+        "remove",
+        "capsule",
+        "init",
+        "build",
+        "watch",
+        "help",
+        "update",
+        "patch",
+    };
+
+    for (commands) |cmd| {
+        try testing.expect(cli.Command.parse(cmd) != null);
+    }
+}

@@ -28,15 +28,35 @@ pub fn build(b: *std.Build) void {
 
     // ============ TESTS ============
 
-    const unit_tests = b.addTest(.{
+    const test_step = b.step("test", "Run all tests");
+
+    // Main module tests (inline tests in src/)
+    const main_tests = b.addTest(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
+    test_step.dependOn(&b.addRunArtifact(main_tests).step);
 
-    const run_tests = b.addRunArtifact(unit_tests);
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_tests.step);
+    // Test files in test/
+    const test_files = [_][]const u8{
+        "test/cli_test.zig",
+        "test/strings_test.zig",
+        "test/capsules_test.zig",
+        "test/patches_test.zig",
+        "test/toolchain_test.zig",
+        "test/update_test.zig",
+        "test/misc_test.zig",
+    };
+
+    for (test_files) |test_file| {
+        const t = b.addTest(.{
+            .root_source_file = b.path(test_file),
+            .target = target,
+            .optimize = optimize,
+        });
+        test_step.dependOn(&b.addRunArtifact(t).step);
+    }
 
     // ============ ZID MODULE ============
 

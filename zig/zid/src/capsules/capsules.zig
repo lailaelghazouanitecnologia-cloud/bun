@@ -17,6 +17,7 @@ const log = zid.ScopedLog("capsules");
 pub const registry = @import("registry.zig");
 pub const fetcher = @import("fetcher.zig");
 pub const manifest = @import("manifest.zig");
+pub const integration = @import("integration.zig");
 
 // Re-export types
 pub const Capsule = registry.Capsule;
