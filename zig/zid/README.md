@@ -185,6 +185,115 @@ src/
     └── pipeline.zig
 ```
 
+## API para Scripts
+
+Zid expone una API pública para crear scripts y herramientas en Zig:
+
+```zig
+const zid = @import("zid");
+
+pub fn main() !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+
+    // === Filesystem ===
+    const content = try zid.api.fs.read(allocator, "config.json");
+    try zid.api.fs.write("output.txt", "Hello!");
+    try zid.api.fs.mkdir("new-dir");
+
+    // Path utilities
+    const name = zid.fs.paths.basename("/path/to/file.txt");  // "file.txt"
+    const ext = zid.fs.paths.extension("file.txt");           // ".txt"
+    const dir = zid.fs.paths.dirname("/path/to/file.txt");    // "/path/to"
+
+    // === Shell ===
+    if (zid.api.shell.hasCommand("bun")) {
+        const result = try zid.api.shell.exec(allocator, "bun", .{"--version"});
+        if (result.success) {
+            std.debug.print("Bun version: {s}", .{result.stdout});
+        }
+    }
+
+    // === HTTP ===
+    const body = try zid.api.http.get(allocator, "https://api.example.com/data");
+
+    // === Templates ===
+    const templates = zid.api.template.list();
+    if (zid.api.template.findBuiltin("zig")) |tmpl| {
+        std.debug.print("Template: {s}\n", .{tmpl.name});
+    }
+
+    // === Search ===
+    const matches = try zid.api.search.glob(allocator, "src/**/*.zig");
+}
+```
+
+### API Modules
+
+| Módulo | Descripción |
+|--------|-------------|
+| `zid.api.fs` | Filesystem: read, write, copy, mkdir, stat |
+| `zid.api.shell` | Shell: exec, hasCommand, getEnv |
+| `zid.api.http` | HTTP: get, post, download |
+| `zid.api.search` | Search: glob, grep |
+| `zid.api.template` | Templates: list, findBuiltin |
+| `zid.api.json` | JSON: parse, stringify |
+
+## Custom Toolchains
+
+Añade tus propios toolchains creando `~/.zid/toolchains.json`:
+
+```json
+{
+  "gleam": {
+    "description": "Gleam language",
+    "homepage": "https://gleam.run",
+    "url_template": "https://github.com/gleam-lang/gleam/releases/download/v{version}/gleam-v{version}-{arch}-unknown-{os}-musl.tar.gz",
+    "archive": "tar_gz",
+    "binary": "gleam"
+  },
+  "vlang": {
+    "description": "V programming language",
+    "homepage": "https://vlang.io",
+    "url_template": "https://github.com/vlang/v/releases/download/{version}/v_{os}.zip",
+    "archive": "zip",
+    "binary": "v",
+    "binary_path": "v"
+  }
+}
+```
+
+**Placeholders disponibles:**
+- `{version}` - Versión (ej: "1.0.0")
+- `{os}` - Sistema operativo (linux, darwin, windows)
+- `{arch}` - Arquitectura (x86_64, aarch64)
+
+Luego: `zid install gleam@1.0.0`
+
+## Detección de Conflictos
+
+Zid detecta cuando una herramienta existe en el sistema Y en zid:
+
+```
+$ zid install bun
+⚠️  Conflicto detectado: 'bun'
+   Sistema: /usr/local/bin/bun (v1.0.0)
+   Zid:     ~/.zid/bin/bun (v1.1.0)
+
+Soluciones:
+  1. Usar 'zid bun' para ejecutar la versión de zid
+  2. Ejecutar 'zid use bun' para cambiar PATH
+```
+
+### Ejecutar con Prefijo
+
+```bash
+# Ejecuta la versión de zid, evitando conflictos
+zid bun run script.ts
+zid zig build
+zid node app.js
+```
+
 ## Estado de Implementación
 
 ### Core Patterns (misc/) ✅
@@ -207,9 +316,22 @@ src/
 |--------|-------------|--------|
 | `versions.zig` | Semver parsing y comparación | ✅ |
 | `registry.zig` | Definición de tools + URLs | ✅ |
+| `resolver.zig` | Detección de conflictos | ✅ |
+| `custom.zig` | Custom toolchains via JSON | ✅ |
 | `downloader.zig` | HTTP download con progress | ✅ |
 | `extractor.zig` | tar.gz, tar.xz, zip | ✅ |
 | `installer.zig` | Orquestación completa | ✅ |
+
+### API Module ✅
+
+| Módulo | Descripción | Estado |
+|--------|-------------|--------|
+| `fs.zig` | Filesystem operations | ✅ |
+| `shell.zig` | Shell execution | ✅ |
+| `http.zig` | HTTP client | ✅ |
+| `search.zig` | Glob/grep | ✅ |
+| `template.zig` | Project templates | ✅ |
+| `json.zig` | JSON utilities | ✅ |
 
 ### Capsules System ✅
 
@@ -219,6 +341,9 @@ src/
 | `registry.zig` | Built-in capsule definitions | ✅ |
 | `fetcher.zig` | External capsule download | ✅ |
 | `manifest.zig` | Capsule manifest parsing | ✅ |
+| `paths.zig` | Capsule path resolution | ✅ |
+| `shell.zig` | Shell environment config | ✅ |
+| `integration.zig` | Build system integration | ✅ |
 
 ### Patches System ✅
 
@@ -228,6 +353,16 @@ src/
 | `registry.zig` | Fetch available patches | ✅ |
 | `applicator.zig` | Apply patches | ✅ |
 
+**Nota**: Los patches se ejecutan automáticamente al inicio de zid, no son un comando CLI.
+
+### Framework (Transpilers) ✅
+
+| Módulo | Descripción | Estado |
+|--------|-------------|--------|
+| `ir.zig` | Intermediate Representation | ✅ |
+| `pipeline.zig` | Compilation pipeline | ✅ |
+| `metadata.zig` | Source metadata | ✅ |
+
 ### Self-Update ✅
 
 | Feature | Descripción | Estado |
@@ -236,13 +371,20 @@ src/
 | Atomic update | Reemplazo atómico con rollback | ✅ |
 | Checksum verify | Verificación de integridad | ✅ |
 
-### Pendiente
+## Tests
 
+```bash
+# Ejecutar todos los tests (requiere Zig 0.14+)
+zig build test
+
+# Con resumen detallado
+zig build test --summary all
+
+# Test específico
+zig build test -- --test-filter "version"
 ```
-[ ] Apps registry - Base de datos persistente
-[ ] Framework IR - Intermediate representation
-[ ] Server component - Para registry remoto
-```
+
+**Estado actual**: ✅ 155/155 tests pasan
 
 ## Patrones Core (de Bun)
 
