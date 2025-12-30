@@ -28,6 +28,35 @@ pub const fail = misc.fail;
 pub const SmallList = misc.SmallList;
 pub const HivePool = misc.HivePool;
 
+// Logger (structured logging with source locations)
+pub const Log = misc.Log;
+pub const Msg = misc.Msg;
+pub const Loc = misc.Loc;
+pub const Location = misc.Location;
+pub const Range = misc.Range;
+pub const ScopedLog = misc.ScopedLog;
+
+// Options (configuration)
+pub const Target = misc.Target;
+pub const OutputFormat = misc.OutputFormat;
+pub const OptLevel = misc.OptLevel;
+pub const Toolchain = misc.Toolchain;
+pub const BuildOptions = misc.BuildOptions;
+pub const GlobalConfig = misc.GlobalConfig;
+pub const Features = misc.Features;
+
+// Caching
+pub const CacheSet = misc.CacheSet;
+pub const FileCache = misc.FileCache;
+pub const ContentCache = misc.ContentCache;
+pub const LruCache = misc.LruCache;
+
+// Progress tracking
+pub const Progress = misc.Progress;
+pub const ProgressBar = misc.ProgressBar;
+pub const Spinner = misc.Spinner;
+pub const TaskTracker = misc.TaskTracker;
+
 // ============ CORE EXPORTS ============
 
 pub const Environment = @import("env.zig");

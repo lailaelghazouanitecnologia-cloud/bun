@@ -30,6 +30,46 @@ pub const StateMachine = state.StateMachine;
 pub const Pipeline = state.Pipeline;
 pub const PipelineState = state.PipelineState;
 
+// ============ LOGGING ============
+
+pub const logger = @import("logger.zig");
+pub const Log = logger.Log;
+pub const Msg = logger.Msg;
+pub const Kind = logger.Kind;
+pub const Loc = logger.Loc;
+pub const Location = logger.Location;
+pub const Range = logger.Range;
+pub const ScopedLog = logger.ScopedLog;
+
+// ============ OPTIONS ============
+
+pub const options = @import("options.zig");
+pub const Target = options.Target;
+pub const OutputFormat = options.OutputFormat;
+pub const OptLevel = options.OptLevel;
+pub const Toolchain = options.Toolchain;
+pub const BuildOptions = options.BuildOptions;
+pub const GlobalConfig = options.GlobalConfig;
+pub const Features = options.Features;
+
+// ============ CACHING ============
+
+pub const cache = @import("cache.zig");
+pub const CacheSet = cache.Set;
+pub const FileCache = cache.FileCache;
+pub const ContentCache = cache.ContentCache;
+pub const PathCache = cache.PathCache;
+pub const LruCache = cache.LruCache;
+pub const DiskCache = cache.DiskCache;
+
+// ============ PROGRESS ============
+
+pub const progress = @import("progress.zig");
+pub const Progress = progress;
+pub const ProgressBar = progress.Bar;
+pub const Spinner = progress.Spinner;
+pub const TaskTracker = progress.TaskTracker;
+
 // ============ COLLECTIONS ============
 
 pub const SmallList = @import("collections/list.zig").SmallList;
