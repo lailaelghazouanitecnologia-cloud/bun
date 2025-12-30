@@ -34,6 +34,10 @@ pub fn printHelp() void {
         \\    build, b                  Build project
         \\    watch, w                  Watch mode
         \\
+        \\  {s}Discovery:{s}
+        \\    search, s <query>         Search for tools
+        \\    completions               Generate shell completions
+        \\
         \\  {s}Options:{s}
         \\    -h, --help                Show help
         \\    -v, --version             Show version
@@ -46,6 +50,7 @@ pub fn printHelp() void {
     , .{
         Output.Color.bold, Output.Color.reset,
         Output.Color.bold, Output.Color.reset,
+        Output.Color.cyan, Output.Color.reset,
         Output.Color.cyan, Output.Color.reset,
         Output.Color.cyan, Output.Color.reset,
         Output.Color.cyan, Output.Color.reset,

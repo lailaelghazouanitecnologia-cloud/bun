@@ -17,6 +17,8 @@ pub const BuildCommand = @import("cli/build.zig");
 pub const CapsuleCommand = @import("cli/capsule.zig");
 pub const HelpCommand = @import("cli/help.zig");
 pub const UpdateCommand = @import("cli/update.zig");
+pub const CompletionsCommand = @import("cli/completions.zig");
+pub const SearchCommand = @import("cli/search.zig");
 
 // Subsystems
 const toolchain = @import("toolchain/toolchain.zig");
@@ -103,6 +105,8 @@ pub const Command = enum {
     help,
     update,
     conflicts,
+    completions,
+    search,
 
     pub fn parse(s: []const u8) ?Command {
         const map = std.StaticStringMap(Command).initComptime(.{
@@ -135,6 +139,9 @@ pub const Command = enum {
             .{ "update", .update },
             .{ "upgrade", .update },
             .{ "conflicts", .conflicts },
+            .{ "completions", .completions },
+            .{ "search", .search },
+            .{ "s", .search },
         });
         return map.get(s);
     }
@@ -156,6 +163,8 @@ pub const Command = enum {
             .help => HelpCommand.run(alloc, args),
             .update => @import("cli/update.zig").run(alloc, args),
             .conflicts => runConflicts(alloc),
+            .completions => CompletionsCommand.run(alloc, args),
+            .search => SearchCommand.run(alloc, args),
         }
     }
 };

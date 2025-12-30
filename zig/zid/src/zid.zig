@@ -86,6 +86,10 @@ pub const api = @import("api/api.zig");
 // HTTP client
 pub const http = @import("http/http.zig");
 
+// Shell integration
+pub const shell = @import("shell/mod.zig");
+pub const search = @import("toolchain/search.zig");
+
 // ============ ALLOCATORS ============
 
 /// Default allocator for general use.
