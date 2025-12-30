@@ -232,11 +232,15 @@ pub const Interpreter = struct {
 
         var ctx = builtins.Context.init(self.allocator, args, &self.env, self.cwd);
         ctx.stdin = stdin;
-        defer ctx.deinit();
 
         // Handle cd specially - it modifies interpreter state
         if (std.mem.eql(u8, name, "cd")) {
             const result = b.func(&ctx);
+            // Copy stdout/stderr before ctx is deinitialized
+            const stdout_copy = try self.allocator.dupe(u8, result.stdout);
+            const stderr_copy = try self.allocator.dupe(u8, result.stderr);
+            ctx.deinit();
+
             if (result.exit_code == 0) {
                 // Update cwd
                 var buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -245,10 +249,16 @@ pub const Interpreter = struct {
                     self.cwd = self.allocator.dupe(u8, new_cwd) catch self.cwd;
                 } else |_| {}
             }
-            return result;
+            return .{ .exit_code = result.exit_code, .stdout = stdout_copy, .stderr = stderr_copy };
         }
 
-        return b.func(&ctx);
+        const result = b.func(&ctx);
+        // Copy stdout/stderr before ctx is deinitialized
+        const stdout_copy = try self.allocator.dupe(u8, result.stdout);
+        const stderr_copy = try self.allocator.dupe(u8, result.stderr);
+        ctx.deinit();
+
+        return .{ .exit_code = result.exit_code, .stdout = stdout_copy, .stderr = stderr_copy };
     }
 
     fn execExternal(self: *Interpreter, program: []const u8, args: []const []const u8, stdin: ?[]const u8) !builtins.BuiltinResult {
@@ -263,7 +273,7 @@ pub const Interpreter = struct {
 
         // Create child process
         var child = std.process.Child.init(argv.items, self.allocator);
-        child.cwd = .{ .cwd = self.cwd };
+        child.cwd = self.cwd;
         child.stdout_behavior = .Pipe;
         child.stderr_behavior = .Pipe;
 
@@ -425,9 +435,9 @@ pub const Interpreter = struct {
         return result.toOwnedSlice() catch "";
     }
 
-    fn expandSubstitution(self: *Interpreter, cmd: []const u8) ![]const u8 {
+    fn expandSubstitution(self: *Interpreter, cmd: []const u8) error{SubstitutionError}![]const u8 {
         // Execute command and capture output
-        const result = try self.exec(cmd);
+        const result = self.exec(cmd) catch return error.SubstitutionError;
 
         // Trim trailing newline
         var output = result.stdout;

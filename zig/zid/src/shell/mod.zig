@@ -91,7 +91,7 @@ pub fn hasCommand(allocator: std.mem.Allocator, cmd: []const u8) bool {
     while (paths.next()) |dir| {
         const full = std.fs.path.join(allocator, &.{ dir, cmd }) catch continue;
         defer allocator.free(full);
-        std.fs.accessAbsolute(full, .{ .mode = .execute_only }) catch continue;
+        std.fs.accessAbsolute(full, .{}) catch continue;
         return true;
     }
 

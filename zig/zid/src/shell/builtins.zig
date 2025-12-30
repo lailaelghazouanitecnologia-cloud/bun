@@ -98,8 +98,8 @@ pub const builtins = [_]Builtin{
     .{ .name = "mv", .func = &mv, .description = "Move/rename files" },
     .{ .name = "touch", .func = &touch, .description = "Create empty file or update timestamp" },
     .{ .name = "which", .func = &which, .description = "Locate a command" },
-    .{ .name = "env", .func = &env, .description = "Print environment variables" },
-    .{ .name = "export", .func = &export, .description = "Set environment variable" },
+    .{ .name = "env", .func = &env_builtin, .description = "Print environment variables" },
+    .{ .name = "export", .func = &export_builtin, .description = "Set environment variable" },
     .{ .name = "unset", .func = &unset, .description = "Unset environment variable" },
     .{ .name = "true", .func = &true_builtin, .description = "Return success" },
     .{ .name = "false", .func = &false_builtin, .description = "Return failure" },
@@ -545,7 +545,7 @@ fn which(ctx: *Context) BuiltinResult {
         var paths = std.mem.splitScalar(u8, path_env, ':');
         while (paths.next()) |dir| {
             const full = std.fs.path.join(ctx.allocator, &.{ dir, cmd }) catch continue;
-            fs.accessAbsolute(full, .{ .mode = .execute_only }) catch continue;
+            fs.accessAbsolute(full, .{}) catch continue;
             ctx.writeLine(full);
             found = true;
             break;
@@ -559,7 +559,7 @@ fn which(ctx: *Context) BuiltinResult {
     return .{ .exit_code = 0, .stdout = ctx.stdout.items, .stderr = ctx.stderr.items };
 }
 
-fn env(ctx: *Context) BuiltinResult {
+fn env_builtin(ctx: *Context) BuiltinResult {
     var iter = ctx.env.iterator();
     while (iter.next()) |entry| {
         ctx.print("{s}={s}\n", .{ entry.key_ptr.*, entry.value_ptr.* });
@@ -567,7 +567,7 @@ fn env(ctx: *Context) BuiltinResult {
     return .{ .exit_code = 0, .stdout = ctx.stdout.items, .stderr = "" };
 }
 
-fn export(ctx: *Context) BuiltinResult {
+fn export_builtin(ctx: *Context) BuiltinResult {
     for (ctx.args) |arg| {
         if (std.mem.indexOf(u8, arg, "=")) |eq_pos| {
             const key = arg[0..eq_pos];

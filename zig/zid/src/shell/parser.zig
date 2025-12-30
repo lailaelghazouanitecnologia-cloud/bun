@@ -270,58 +270,56 @@ pub const Parser = struct {
         var parts = std.ArrayList(Node.WordPart).init(self.allocator);
         defer parts.deinit();
 
-        // A word can be made of multiple consecutive tokens
-        while (!self.isAtEnd()) {
-            const tok = self.current();
+        // Parse a single word (one token, or compound like $var"text")
+        const tok = self.current();
 
-            switch (tok.kind) {
-                .word => {
-                    try parts.append(.{ .literal = tok.text });
-                    self.advance();
-                },
-                .glob => {
-                    try parts.append(.{ .glob = tok.text });
-                    self.advance();
-                },
-                .variable => {
-                    try parts.append(.{ .variable = tok.text });
-                    self.advance();
-                },
-                .string => {
-                    // Remove quotes
-                    const text = tok.text;
-                    const inner = if (text.len >= 2) text[1 .. text.len - 1] else text;
-                    try parts.append(.{ .quoted = inner });
-                    self.advance();
-                },
-                .raw_string => {
-                    const text = tok.text;
-                    const inner = if (text.len >= 2) text[1 .. text.len - 1] else text;
-                    try parts.append(.{ .raw = inner });
-                    self.advance();
-                },
-                .backtick => {
-                    const text = tok.text;
-                    const inner = if (text.len >= 2) text[1 .. text.len - 1] else text;
-                    try parts.append(.{ .subst = inner });
-                    self.advance();
-                },
-                .subst_start => {
-                    // Handle $(...)
-                    self.advance();
-                    // TODO: parse nested command
-                    var depth: usize = 1;
-                    const start = self.pos;
-                    while (!self.isAtEnd() and depth > 0) {
-                        if (self.check(.lparen)) depth += 1;
-                        if (self.check(.rparen)) depth -= 1;
-                        if (depth > 0) self.advance();
-                    }
-                    if (self.check(.rparen)) self.advance();
-                    _ = start;
-                },
-                else => break,
-            }
+        switch (tok.kind) {
+            .word => {
+                try parts.append(.{ .literal = tok.text });
+                self.advance();
+            },
+            .glob => {
+                try parts.append(.{ .glob = tok.text });
+                self.advance();
+            },
+            .variable => {
+                try parts.append(.{ .variable = tok.text });
+                self.advance();
+            },
+            .string => {
+                // Remove quotes
+                const text = tok.text;
+                const inner = if (text.len >= 2) text[1 .. text.len - 1] else text;
+                try parts.append(.{ .quoted = inner });
+                self.advance();
+            },
+            .raw_string => {
+                const text = tok.text;
+                const inner = if (text.len >= 2) text[1 .. text.len - 1] else text;
+                try parts.append(.{ .raw = inner });
+                self.advance();
+            },
+            .backtick => {
+                const text = tok.text;
+                const inner = if (text.len >= 2) text[1 .. text.len - 1] else text;
+                try parts.append(.{ .subst = inner });
+                self.advance();
+            },
+            .subst_start => {
+                // Handle $(...)
+                self.advance();
+                // TODO: parse nested command
+                var depth: usize = 1;
+                const start = self.pos;
+                while (!self.isAtEnd() and depth > 0) {
+                    if (self.check(.lparen)) depth += 1;
+                    if (self.check(.rparen)) depth -= 1;
+                    if (depth > 0) self.advance();
+                }
+                if (self.check(.rparen)) self.advance();
+                _ = start;
+            },
+            else => {},
         }
 
         return .{ .parts = try parts.toOwnedSlice() };
