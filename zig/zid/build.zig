@@ -47,7 +47,7 @@ pub fn build(b: *std.Build) void {
 
     // Test files in test/ - add zid module dependency
     const test_files = [_][]const u8{
-        // Existing tests
+        // Core module tests
         "test/cli_test.zig",
         "test/strings_test.zig",
         "test/capsules_test.zig",
@@ -63,6 +63,11 @@ pub fn build(b: *std.Build) void {
         "test/unit/template_test.zig",
         "test/unit/custom_toolchain_test.zig",
         "test/unit/api_test.zig",
+        // Examples (practical usage demonstrations)
+        "test/examples/download_tool.zig",
+        "test/examples/environment.zig",
+        "test/examples/file_operations.zig",
+        "test/examples/toolchain_info.zig",
     };
 
     for (test_files) |test_file| {

@@ -83,6 +83,9 @@ pub const capsules = @import("capsules/capsules.zig");
 pub const patches = @import("patches/patches.zig");
 pub const api = @import("api/api.zig");
 
+// HTTP client
+pub const http = @import("http/http.zig");
+
 // ============ ALLOCATORS ============
 
 /// Default allocator for general use.
