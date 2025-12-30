@@ -43,17 +43,18 @@ pub const Conflict = struct {
 /// Check if command exists in system PATH (excluding ~/.zid/bin)
 pub fn findSystemCommand(allocator: std.mem.Allocator, cmd: []const u8) ?[]const u8 {
     const path_env = std.posix.getenv("PATH") orelse return null;
-    const zid_bin = zid.getHome() ++ "/bin";
+    const home = zid.getHome();
 
-    var paths = std.mem.splitScalar(u8, path_env, ':');
-    while (paths.next()) |dir| {
+    var paths_iter = std.mem.splitScalar(u8, path_env, ':');
+    while (paths_iter.next()) |dir| {
         // Skip zid's bin directory
-        if (std.mem.startsWith(u8, dir, zid_bin)) continue;
+        if (std.mem.indexOf(u8, dir, ".zid/bin") != null) continue;
+        if (std.mem.startsWith(u8, dir, home) and std.mem.endsWith(u8, dir, "/bin")) continue;
 
         var buf: [std.fs.max_path_bytes]u8 = undefined;
         const full_path = std.fmt.bufPrint(&buf, "{s}/{s}", .{ dir, cmd }) catch continue;
 
-        std.fs.accessAbsolute(full_path, .{ .mode = .execute_only }) catch continue;
+        std.fs.accessAbsolute(full_path, .{}) catch continue;
 
         // Found in system PATH
         return allocator.dupe(u8, full_path) catch null;
@@ -68,7 +69,7 @@ pub fn findZidToolchain(cmd: []const u8) ?[]const u8 {
     var buf: [std.fs.max_path_bytes]u8 = undefined;
     const zid_path = std.fmt.bufPrint(&buf, "{s}/bin/{s}", .{ home, cmd }) catch return null;
 
-    std.fs.accessAbsolute(zid_path, .{ .mode = .execute_only }) catch return null;
+    std.fs.accessAbsolute(zid_path, .{}) catch return null;
     return zid_path;
 }
 

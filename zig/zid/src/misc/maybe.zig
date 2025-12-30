@@ -80,6 +80,10 @@ pub const Error = struct {
         syntax_error = 100,
         unexpected_token = 101,
         invalid_utf8 = 102,
+        parse_error = 103,
+        invalid_input = 104,
+        // Network
+        network_error = 150,
         // Toolchain
         tool_not_found = 200,
         version_not_found = 201,
@@ -88,6 +92,7 @@ pub const Error = struct {
         app_not_found = 300,
         build_failed = 301,
         // Generic
+        internal_error = 998,
         unknown = 999,
     };
 
@@ -106,17 +111,18 @@ pub const Error = struct {
         compile,
         link,
         // Network
+        network,
         download,
         extract,
     };
 
     /// Create error from std error
-    pub fn from(err: anyerror, step: Step, path: []const u8) Error {
+    pub fn from(e: anyerror, step: Step, path: []const u8) Error {
         return .{
-            .code = mapError(err),
+            .code = mapError(e),
             .step = step,
             .path = path,
-            .message = @errorName(err),
+            .message = @errorName(e),
         };
     }
 
@@ -143,8 +149,8 @@ pub const Error = struct {
         stderr.print("\n", .{}) catch {};
     }
 
-    fn mapError(err: anyerror) Code {
-        return switch (err) {
+    fn mapError(e: anyerror) Code {
+        return switch (e) {
             error.FileNotFound => .not_found,
             error.AccessDenied => .permission_denied,
             error.OutOfMemory => .out_of_memory,

@@ -158,7 +158,7 @@ fn runCreate(allocator: std.mem.Allocator, args: []const []const u8) void {
     // Create capsule structure
     switch (capsules.integration.createStubCapsule(allocator, name)) {
         .ok => {
-            var mgr = capsules.Manager.init(allocator);
+            const mgr = capsules.Manager.init(allocator);
 
             Output.success("Created capsule: {s}\n\n", .{name});
             Output.print("Structure:\n", .{});

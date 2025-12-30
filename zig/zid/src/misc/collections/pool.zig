@@ -138,7 +138,8 @@ pub fn ArenaPool(comptime T: type) type {
 }
 
 /// Handle - Typed index into pool (safer than raw pointers)
-pub fn Handle(comptime T: type) type {
+/// T is the element type for documentation, not used in the handle itself
+pub fn Handle(comptime _: type) type {
     return packed struct {
         index: u16,
         generation: u16, // Detect use-after-free

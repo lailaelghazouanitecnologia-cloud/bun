@@ -2,7 +2,8 @@
 
 const std = @import("std");
 const testing = std.testing;
-const framework = @import("../src/framework/framework.zig");
+const zid = @import("zid");
+const framework = zid.framework;
 const ir = framework.ir;
 
 // ============ IR Tests ============

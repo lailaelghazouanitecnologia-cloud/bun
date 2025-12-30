@@ -2,10 +2,10 @@
 
 const std = @import("std");
 const testing = std.testing;
+const zid = @import("zid");
+const cli = zid.cli;
 
 test "parse command" {
-    const cli = @import("../src/cli.zig");
-
     try testing.expectEqual(cli.Command.install, cli.Command.parse("install").?);
     try testing.expectEqual(cli.Command.install, cli.Command.parse("i").?);
     try testing.expectEqual(cli.Command.build, cli.Command.parse("b").?);
@@ -13,8 +13,6 @@ test "parse command" {
 }
 
 test "parse command aliases" {
-    const cli = @import("../src/cli.zig");
-
     try testing.expectEqual(cli.Command.uninstall, cli.Command.parse("rm").?);
     try testing.expectEqual(cli.Command.list, cli.Command.parse("ls").?);
     try testing.expectEqual(cli.Command.init, cli.Command.parse("create").?);
@@ -22,8 +20,6 @@ test "parse command aliases" {
 }
 
 test "parse new commands" {
-    const cli = @import("../src/cli.zig");
-
     // Capsule commands
     try testing.expectEqual(cli.Command.capsule, cli.Command.parse("capsule").?);
     try testing.expectEqual(cli.Command.capsule, cli.Command.parse("cap").?);
@@ -36,7 +32,6 @@ test "parse new commands" {
 }
 
 test "all commands exist" {
-    const cli = @import("../src/cli.zig");
 
     // Verify all enum variants can be parsed
     // Note: patch removed - it's auto-run at startup for security

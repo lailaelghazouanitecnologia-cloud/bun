@@ -75,9 +75,9 @@ pub fn writeJson(path: []const u8, value: anytype) !void {
 
 /// Copy file or directory recursively
 pub fn copy(src: []const u8, dest: []const u8) !void {
-    const stat = try std.fs.cwd().statFile(src);
+    const file_stat = try std.fs.cwd().statFile(src);
 
-    if (stat.kind == .directory) {
+    if (file_stat.kind == .directory) {
         try copyDir(src, dest);
     } else {
         try copyFile(src, dest);
@@ -128,8 +128,8 @@ pub fn rmdir(path: []const u8) !void {
 
 /// Delete file or directory (auto-detect)
 pub fn remove(path: []const u8) !void {
-    const stat = std.fs.cwd().statFile(path) catch return;
-    if (stat.kind == .directory) {
+    const file_stat = std.fs.cwd().statFile(path) catch return;
+    if (file_stat.kind == .directory) {
         try rmdir(path);
     } else {
         try rm(path);
@@ -198,14 +198,14 @@ pub fn exists(path: []const u8) bool {
 
 /// Check if path is directory
 pub fn isDir(path: []const u8) bool {
-    const stat = std.fs.cwd().statFile(path) catch return false;
-    return stat.kind == .directory;
+    const file_stat = std.fs.cwd().statFile(path) catch return false;
+    return file_stat.kind == .directory;
 }
 
 /// Check if path is file
 pub fn isFile(path: []const u8) bool {
-    const stat = std.fs.cwd().statFile(path) catch return false;
-    return stat.kind == .file;
+    const file_stat = std.fs.cwd().statFile(path) catch return false;
+    return file_stat.kind == .file;
 }
 
 /// Get file info

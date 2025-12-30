@@ -2,8 +2,9 @@
 
 const std = @import("std");
 const testing = std.testing;
+const zid = @import("zid");
 
-const patches = @import("../src/patches/patches.zig");
+const patches = zid.patches;
 
 // ============ SEVERITY TESTS ============
 

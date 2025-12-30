@@ -5,7 +5,8 @@
 
 const std = @import("std");
 const testing = std.testing;
-const custom = @import("../src/toolchain/custom.zig");
+const zid = @import("zid");
+const custom = zid.toolchain.custom;
 
 // ============================================================================
 // CustomToolchain STRUCT
@@ -85,7 +86,7 @@ test "toToolDef: convierte CustomToolchain a ToolDef" {
     try testing.expectEqualStrings("mytools", def.name);
     try testing.expectEqualStrings("My tools", def.description);
     try testing.expectEqualStrings("mytool", def.binary);
-    try testing.expectEqual(@import("../src/toolchain/registry.zig").ToolDef.Archive.zip, def.archive);
+    try testing.expectEqual(zid.toolchain.registry.ToolDef.Archive.zip, def.archive);
 }
 
 // ============================================================================

@@ -72,6 +72,7 @@ pub const apps = @import("apps/apps.zig");
 pub const framework = @import("framework/framework.zig");
 pub const capsules = @import("capsules/capsules.zig");
 pub const patches = @import("patches/patches.zig");
+pub const api = @import("api/api.zig");
 
 // ============ ALLOCATORS ============
 
@@ -120,7 +121,7 @@ pub fn getBinDir() []const u8 {
 // ============ PANIC HANDLER ============
 
 pub fn panic(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
-    @setCold(true);
+    @branchHint(.cold);
 
     Output.err("PANIC: {s}\n", .{msg});
 

@@ -2,7 +2,8 @@
 
 const std = @import("std");
 const testing = std.testing;
-const apps = @import("../src/apps/apps.zig");
+const zid = @import("zid");
+const apps = zid.apps;
 const db = apps.db;
 
 test "AppKind enum values" {

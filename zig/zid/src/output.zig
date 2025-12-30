@@ -71,6 +71,15 @@ pub fn bold(comptime fmt: []const u8, args: anytype) void {
     }
 }
 
+pub fn debug(comptime fmt: []const u8, args: anytype) void {
+    if (!Environment.isDebug) return;
+    if (useColor()) {
+        stderr.print(Color.dim ++ fmt ++ Color.reset, args) catch {};
+    } else {
+        stderr.print(fmt, args) catch {};
+    }
+}
+
 // ============ SCOPED LOGGING ============
 
 /// Scoped logger - enable with ZID_DEBUG_<SCOPE>=1

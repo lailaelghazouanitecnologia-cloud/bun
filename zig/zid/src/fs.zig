@@ -59,9 +59,9 @@ pub fn realpath(alloc: std.mem.Allocator, path: []const u8) ![]u8 {
 }
 
 // Path utilities
-pub const path = struct {
-    pub fn join(alloc: std.mem.Allocator, paths: []const []const u8) ![]u8 {
-        return std.fs.path.join(alloc, paths);
+pub const paths = struct {
+    pub fn join(alloc: std.mem.Allocator, parts: []const []const u8) ![]u8 {
+        return std.fs.path.join(alloc, parts);
     }
 
     pub fn dirname(p: []const u8) []const u8 {

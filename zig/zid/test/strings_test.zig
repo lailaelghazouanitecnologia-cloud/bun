@@ -2,7 +2,8 @@
 
 const std = @import("std");
 const testing = std.testing;
-const strings = @import("../src/strings.zig");
+const zid = @import("zid");
+const strings = zid.strings;
 
 test "string operations" {
     try testing.expect(strings.startsWith("hello world", "hello"));

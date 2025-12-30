@@ -39,7 +39,7 @@ pub const CapsulePaths = struct {
 
 /// Get paths for all installed capsules
 pub fn getAllPaths(allocator: std.mem.Allocator) Maybe([]const CapsulePaths) {
-    var mgr = capsules.Manager.init(allocator);
+    const mgr = capsules.Manager.init(allocator);
     var paths_list = std.ArrayList(CapsulePaths).init(allocator);
 
     // Scan intern capsules

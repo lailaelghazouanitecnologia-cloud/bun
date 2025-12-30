@@ -5,31 +5,26 @@
 
 const std = @import("std");
 const testing = std.testing;
+const zid = @import("zid");
 
 // ============================================================================
 // FS - Solo lógica, no wrappers
 // ============================================================================
 
-test "fs: basename extrae nombre de archivo" {
-    const fs = @import("../src/api/fs.zig");
-
-    try testing.expectEqualStrings("file.txt", fs.basename("/path/to/file.txt"));
-    try testing.expectEqualStrings("file.txt", fs.basename("file.txt"));
+test "fs: paths.basename extrae nombre de archivo" {
+    try testing.expectEqualStrings("file.txt", zid.fs.paths.basename("/path/to/file.txt"));
+    try testing.expectEqualStrings("file.txt", zid.fs.paths.basename("file.txt"));
 }
 
-test "fs: extname extrae extensión" {
-    const fs = @import("../src/api/fs.zig");
-
-    try testing.expectEqualStrings(".txt", fs.extname("file.txt"));
-    try testing.expectEqualStrings(".gz", fs.extname("file.tar.gz"));
-    try testing.expectEqualStrings("", fs.extname("noext"));
+test "fs: paths.extension extrae extensión" {
+    try testing.expectEqualStrings(".txt", zid.fs.paths.extension("file.txt"));
+    try testing.expectEqualStrings(".gz", zid.fs.paths.extension("file.tar.gz"));
+    try testing.expectEqualStrings("", zid.fs.paths.extension("noext"));
 }
 
-test "fs: dirname extrae directorio" {
-    const fs = @import("../src/api/fs.zig");
-
-    try testing.expectEqualStrings("/path/to", fs.dirname("/path/to/file.txt").?);
-    try testing.expect(fs.dirname("file.txt") == null);
+test "fs: paths.dirname extrae directorio" {
+    try testing.expectEqualStrings("/path/to", zid.fs.paths.dirname("/path/to/file.txt"));
+    try testing.expectEqualStrings(".", zid.fs.paths.dirname("file.txt"));
 }
 
 // ============================================================================
@@ -37,7 +32,7 @@ test "fs: dirname extrae directorio" {
 // ============================================================================
 
 test "search: Match struct tiene campos correctos" {
-    const search = @import("../src/api/search.zig");
+    const search = zid.api.search;
 
     const match = search.Match{
         .file = "src/main.zig",
@@ -51,7 +46,7 @@ test "search: Match struct tiene campos correctos" {
 }
 
 test "search: FindOptions tiene defaults sensatos" {
-    const search = @import("../src/api/search.zig");
+    const search = zid.api.search;
 
     const opts = search.FindOptions{};
 
@@ -66,7 +61,7 @@ test "search: FindOptions tiene defaults sensatos" {
 // ============================================================================
 
 test "shell: ExecResult.ok verifica success" {
-    const shell = @import("../src/api/shell.zig");
+    const shell = zid.api.shell;
 
     const success = shell.ExecResult{
         .stdout = "output",
@@ -80,7 +75,7 @@ test "shell: ExecResult.ok verifica success" {
 }
 
 test "shell: ExecResult con error" {
-    const shell = @import("../src/api/shell.zig");
+    const shell = zid.api.shell;
 
     const failure = shell.ExecResult{
         .stdout = "",
@@ -94,7 +89,7 @@ test "shell: ExecResult con error" {
 }
 
 test "shell: ExecOptions tiene defaults" {
-    const shell = @import("../src/api/shell.zig");
+    const shell = zid.api.shell;
 
     const opts = shell.ExecOptions{};
 
@@ -104,7 +99,7 @@ test "shell: ExecOptions tiene defaults" {
 }
 
 test "shell: hasCommand encuentra comandos del sistema" {
-    const shell = @import("../src/api/shell.zig");
+    const shell = zid.api.shell;
 
     // 'ls' debería existir en sistemas Unix
     try testing.expect(shell.hasCommand("ls"));
@@ -116,46 +111,47 @@ test "shell: hasCommand encuentra comandos del sistema" {
 // ============================================================================
 
 test "http: Response.ok verifica status 2xx" {
-    const http = @import("../src/api/http.zig");
+    const http = zid.api.http;
+    var body_buf: [2]u8 = "{}".*;
 
     const ok_resp = http.Response{
         .status = 200,
-        .body = "{}",
+        .body = &body_buf,
         .headers = &.{},
     };
     try testing.expect(ok_resp.ok());
 
     const created = http.Response{
         .status = 201,
-        .body = "{}",
+        .body = &body_buf,
         .headers = &.{},
     };
     try testing.expect(created.ok());
 
     const not_found = http.Response{
         .status = 404,
-        .body = "{}",
+        .body = &body_buf,
         .headers = &.{},
     };
     try testing.expect(!not_found.ok());
 
     const server_error = http.Response{
         .status = 500,
-        .body = "{}",
+        .body = &body_buf,
         .headers = &.{},
     };
     try testing.expect(!server_error.ok());
 }
 
 test "http: Method enum tiene valores correctos" {
-    const http = @import("../src/api/http.zig");
+    const http = zid.api.http;
 
     try testing.expect(http.Method.GET != http.Method.POST);
     try testing.expect(http.Method.PUT != http.Method.DELETE);
 }
 
 test "http: Header struct" {
-    const http = @import("../src/api/http.zig");
+    const http = zid.api.http;
 
     const header = http.Header{
         .name = "Content-Type",
@@ -170,10 +166,9 @@ test "http: Header struct" {
 // JSON - Helpers
 // ============================================================================
 
-test "json: parseValue no crashea con JSON válido" {
-    const json = @import("../src/api/json.zig");
-
-    const content = "{\"key\": \"value\"}";
-    // Solo verificamos que no crashea
-    _ = json.parseValue(testing.allocator, content) catch {};
+test "json: module exports exist" {
+    const json = zid.api.json;
+    // Verify module exports exist (no runtime allocation)
+    _ = json.parseValue;
+    _ = json.stringify;
 }

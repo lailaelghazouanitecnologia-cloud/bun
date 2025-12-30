@@ -228,12 +228,12 @@ pub fn which(allocator: std.mem.Allocator, cmd: []const u8) !?[]const u8 {
 pub fn hasCommand(cmd: []const u8) bool {
     const path_env = std.posix.getenv("PATH") orelse return false;
 
-    var paths = std.mem.splitScalar(u8, path_env, ':');
-    while (paths.next()) |dir| {
+    var paths_iter = std.mem.splitScalar(u8, path_env, ':');
+    while (paths_iter.next()) |dir| {
         var buf: [std.fs.max_path_bytes]u8 = undefined;
         const full_path = std.fmt.bufPrint(&buf, "{s}/{s}", .{ dir, cmd }) catch continue;
 
-        std.fs.accessAbsolute(full_path, .{ .mode = .execute_only }) catch continue;
+        std.fs.accessAbsolute(full_path, .{}) catch continue;
         return true;
     }
 

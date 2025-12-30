@@ -2,8 +2,9 @@
 
 const std = @import("std");
 const testing = std.testing;
+const zid = @import("zid");
 
-const update = @import("../src/cli/update.zig");
+const update = zid.cli.UpdateCommand;
 
 // ============ VERSION TESTS ============
 

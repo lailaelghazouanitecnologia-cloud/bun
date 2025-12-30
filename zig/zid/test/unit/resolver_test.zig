@@ -5,7 +5,8 @@
 
 const std = @import("std");
 const testing = std.testing;
-const resolver = @import("../src/toolchain/resolver.zig");
+const zid = @import("zid");
+const resolver = zid.toolchain.resolver;
 
 // ============================================================================
 // DETECCIÓN DE COMANDOS DEL SISTEMA

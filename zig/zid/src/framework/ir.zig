@@ -350,14 +350,14 @@ pub const Builder = struct {
 
     // ============ Declarations ============
 
-    pub fn varDecl(self: *Self, name: []const u8, type_node: NodeRef, init: NodeRef, is_mutable: bool) NodeRef {
+    pub fn varDecl(self: *Self, name: []const u8, type_node: NodeRef, init_value: NodeRef, is_mutable: bool) NodeRef {
         return self.addNode(.{
             .tag = if (is_mutable) .var_decl else .const_decl,
             .loc = .{},
             .data = .{ .var_decl = .{
                 .name = name,
                 .type_node = type_node,
-                .init = init,
+                .init = init_value,
                 .is_mutable = is_mutable,
             } },
         });

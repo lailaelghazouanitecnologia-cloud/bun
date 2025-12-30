@@ -16,6 +16,7 @@ pub const InitCommand = @import("cli/init.zig");
 pub const BuildCommand = @import("cli/build.zig");
 pub const CapsuleCommand = @import("cli/capsule.zig");
 pub const HelpCommand = @import("cli/help.zig");
+pub const UpdateCommand = @import("cli/update.zig");
 
 // Subsystems
 const toolchain = @import("toolchain/toolchain.zig");

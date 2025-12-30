@@ -5,7 +5,8 @@
 
 const std = @import("std");
 const testing = std.testing;
-const template = @import("../src/api/template.zig");
+const zid = @import("zid");
+const template = zid.api.template;
 
 // ============================================================================
 // BUILT-IN TEMPLATES

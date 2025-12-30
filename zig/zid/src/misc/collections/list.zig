@@ -121,11 +121,11 @@ pub fn Span(comptime T: type) type {
 
         const Self = @This();
 
-        pub fn init(slice: []const T) Self {
+        pub fn init(data: []const T) Self {
             return .{
-                .ptr = slice.ptr,
+                .ptr = data.ptr,
                 .start = 0,
-                .end = @intCast(slice.len),
+                .end = @intCast(data.len),
             };
         }
 

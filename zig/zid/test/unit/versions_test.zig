@@ -8,7 +8,8 @@
 
 const std = @import("std");
 const testing = std.testing;
-const versions = @import("../src/toolchain/versions.zig");
+const zid = @import("zid");
+const versions = zid.toolchain.versions;
 const Version = versions.Version;
 const Constraint = versions.Constraint;
 

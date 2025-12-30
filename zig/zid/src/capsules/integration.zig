@@ -20,7 +20,7 @@ pub const ModuleInfo = struct {
 
 /// Generate zig build module paths for installed capsules
 pub fn getModulePaths(allocator: std.mem.Allocator) Maybe([]const ModuleInfo) {
-    var mgr = capsules.Manager.init(allocator);
+    const mgr = capsules.Manager.init(allocator);
     var modules = std.ArrayList(ModuleInfo).init(allocator);
 
     // Scan intern capsules

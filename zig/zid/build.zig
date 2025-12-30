@@ -4,6 +4,13 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // ============ ZID MODULE ============
+
+    // Export zid as a module (used by tests and external projects)
+    const zid_mod = b.addModule("zid", .{
+        .root_source_file = b.path("src/zid.zig"),
+    });
+
     // ============ ZID EXECUTABLE ============
 
     const exe = b.addExecutable(.{
@@ -38,7 +45,7 @@ pub fn build(b: *std.Build) void {
     });
     test_step.dependOn(&b.addRunArtifact(main_tests).step);
 
-    // Test files in test/
+    // Test files in test/ - add zid module dependency
     const test_files = [_][]const u8{
         // Existing tests
         "test/cli_test.zig",
@@ -64,15 +71,10 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         });
+        // Add zid module so tests can @import("zid")
+        t.root_module.addImport("zid", zid_mod);
         test_step.dependOn(&b.addRunArtifact(t).step);
     }
-
-    // ============ ZID MODULE ============
-
-    // Export framework as module for transpiler projects
-    _ = b.addModule("zid", .{
-        .root_source_file = b.path("src/framework/framework.zig"),
-    });
 
     // ============ FORMAT ============
 

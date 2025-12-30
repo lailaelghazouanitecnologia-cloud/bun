@@ -38,7 +38,7 @@ pub fn parseOpts(
 
 /// Parse to dynamic Value
 pub fn parseValue(allocator: std.mem.Allocator, str: []const u8) !std.json.Value {
-    var parsed = try std.json.parseFromSlice(std.json.Value, allocator, str, .{});
+    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, str, .{});
     return parsed.value;
 }
 

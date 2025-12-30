@@ -40,7 +40,6 @@ const LATEST_ENDPOINT = "/releases/latest";
 pub fn run(allocator: std.mem.Allocator, args: []const []const u8) void {
     // Parse args
     var check_only = false;
-    var target_version: ?[]const u8 = null;
 
     for (args) |arg| {
         if (eql(arg, "--check") or eql(arg, "-c")) {
@@ -48,8 +47,6 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) void {
         } else if (eql(arg, "--help") or eql(arg, "-h")) {
             showHelp();
             return;
-        } else if (!std.mem.startsWith(u8, arg, "-")) {
-            target_version = arg;
         }
     }
 
@@ -97,8 +94,6 @@ pub fn run(allocator: std.mem.Allocator, args: []const []const u8) void {
             Output.print("Your installation was not modified.\n", .{});
         },
     }
-
-    _ = target_version;
 }
 
 /// Get latest release info
