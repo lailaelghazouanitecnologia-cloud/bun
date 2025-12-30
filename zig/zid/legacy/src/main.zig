@@ -8,7 +8,3 @@ pub fn main() !void {
 
     try cli.run(alloc);
 }
-
-test {
-    std.testing.refAllDecls(@This());
-}

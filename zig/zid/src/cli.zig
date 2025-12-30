@@ -1,232 +1,137 @@
 const std = @import("std");
-const config = @import("config.zig");
-const modules = @import("modules.zig");
-const compiler = @import("compiler.zig");
+const toolchain = @import("toolchain/mod.zig");
+const apps = @import("apps/mod.zig");
+const framework = @import("framework/mod.zig");
+
+pub const Command = enum {
+    // Toolchain commands
+    install,
+    uninstall,
+    list,
+    use,
+
+    // Apps commands
+    add,
+    remove,
+    run,
+
+    // Framework commands
+    init,
+    build,
+    watch,
+
+    // Meta
+    help,
+    version,
+};
 
 pub fn run(alloc: std.mem.Allocator) !void {
-    var args = try std.process.argsWithAllocator(alloc);
-    defer args.deinit();
+    const args = try std.process.argsAlloc(alloc);
+    defer std.process.argsFree(alloc, args);
 
-    _ = args.next(); // skip program name
-
-    const cmd = args.next() orelse {
-        printUsage();
-        return;
-    };
-
-    if (std.mem.eql(u8, cmd, "add")) {
-        try cmdAdd(alloc, &args);
-    } else if (std.mem.eql(u8, cmd, "remove")) {
-        try cmdRemove(alloc, &args);
-    } else if (std.mem.eql(u8, cmd, "list")) {
-        try cmdList(alloc);
-    } else if (std.mem.eql(u8, cmd, "config")) {
-        try cmdConfig(alloc, &args);
-    } else if (std.mem.eql(u8, cmd, "run")) {
-        try cmdRun(alloc, &args);
-    } else if (std.mem.eql(u8, cmd, "build")) {
-        try cmdBuild(alloc, &args);
-    } else if (std.mem.eql(u8, cmd, "init")) {
-        try cmdInit(alloc);
-    } else if (std.mem.eql(u8, cmd, "new")) {
-        try cmdNew(alloc, &args);
-    } else if (std.mem.eql(u8, cmd, "help") or std.mem.eql(u8, cmd, "-h") or std.mem.eql(u8, cmd, "--help")) {
-        printUsage();
-    } else if (std.mem.eql(u8, cmd, "version") or std.mem.eql(u8, cmd, "-v") or std.mem.eql(u8, cmd, "--version")) {
-        std.debug.print("zid 0.1.0\n", .{});
-    } else {
-        // Assume it's a file to run
-        try cmdRunFile(alloc, cmd, &args);
-    }
-}
-
-fn cmdAdd(alloc: std.mem.Allocator, args: *std.process.ArgIterator) !void {
-    const module_name = args.next() orelse {
-        std.debug.print("Usage: zid add <@lang/name | @target/name>\n", .{});
-        return;
-    };
-
-    if (!std.mem.startsWith(u8, module_name, "@lang/") and !std.mem.startsWith(u8, module_name, "@target/")) {
-        std.debug.print("Error: Module must start with @lang/ or @target/\n", .{});
+    if (args.len < 2) {
+        printHelp();
         return;
     }
 
-    try modules.install(alloc, module_name);
-    std.debug.print("Installed {s}\n", .{module_name});
-}
-
-fn cmdRemove(alloc: std.mem.Allocator, args: *std.process.ArgIterator) !void {
-    const module_name = args.next() orelse {
-        std.debug.print("Usage: zid remove <@lang/name | @target/name>\n", .{});
-        return;
-    };
-
-    try modules.remove(alloc, module_name);
-    std.debug.print("Removed {s}\n", .{module_name});
-}
-
-fn cmdList(alloc: std.mem.Allocator) !void {
-    const cfg = try config.load(alloc);
-
-    std.debug.print("Installed modules:\n", .{});
-    var it = cfg.modules.iterator();
-    while (it.next()) |entry| {
-        std.debug.print("  {s} ({s})\n", .{ entry.key_ptr.*, entry.value_ptr.* });
-    }
-
-    std.debug.print("\nMappings:\n", .{});
-    var mit = cfg.mappings.iterator();
-    while (mit.next()) |entry| {
-        std.debug.print("  {s} -> {s}\n", .{ entry.key_ptr.*, entry.value_ptr.default });
-    }
-}
-
-fn cmdConfig(alloc: std.mem.Allocator, args: *std.process.ArgIterator) !void {
-    const action = args.next() orelse {
-        std.debug.print("Usage: zid config <add|set|remove|list> [lang] [target]\n", .{});
-        return;
-    };
-
-    if (std.mem.eql(u8, action, "list")) {
-        try cmdList(alloc);
-        return;
-    }
-
-    const lang = args.next() orelse {
-        std.debug.print("Usage: zid config {s} <lang> <target>\n", .{action});
-        return;
-    };
-
-    const target = args.next() orelse {
-        std.debug.print("Usage: zid config {s} {s} <target>\n", .{ action, lang });
-        return;
-    };
-
-    var cfg = try config.load(alloc);
-
-    if (std.mem.eql(u8, action, "add")) {
-        try config.addMapping(&cfg, alloc, lang, target);
-        try config.save(alloc, cfg);
-        std.debug.print("Added {s} -> {s}\n", .{ lang, target });
-    } else if (std.mem.eql(u8, action, "set")) {
-        try config.setDefault(&cfg, lang, target);
-        try config.save(alloc, cfg);
-        std.debug.print("Set {s} default -> {s}\n", .{ lang, target });
-    } else if (std.mem.eql(u8, action, "remove")) {
-        try config.removeMapping(&cfg, lang, target);
-        try config.save(alloc, cfg);
-        std.debug.print("Removed {s} -> {s}\n", .{ lang, target });
-    }
-}
-
-fn cmdRun(alloc: std.mem.Allocator, args: *std.process.ArgIterator) !void {
-    const file = args.next() orelse {
-        std.debug.print("Usage: zid run <file> [--target <target>]\n", .{});
-        return;
-    };
-    try cmdRunFile(alloc, file, args);
-}
-
-fn cmdRunFile(alloc: std.mem.Allocator, file: []const u8, args: *std.process.ArgIterator) !void {
-    var target: ?[]const u8 = null;
-
-    while (args.next()) |arg| {
-        if (std.mem.eql(u8, arg, "--target") or std.mem.eql(u8, arg, "-t")) {
-            target = args.next();
+    const cmd = parseCommand(args[1]) orelse {
+        // Check if it's an app command
+        if (apps.isRegistered(args[1])) {
+            return apps.execute(alloc, args[1], args[2..]);
         }
-    }
-
-    const result = try compiler.compileFile(alloc, file, target);
-    std.debug.print("{s}", .{result});
-}
-
-fn cmdBuild(alloc: std.mem.Allocator, args: *std.process.ArgIterator) !void {
-    const file = args.next() orelse {
-        std.debug.print("Usage: zid build <file> [-o output] [--target <target>]\n", .{});
+        std.debug.print("Unknown command: {s}\n", .{args[1]});
+        printHelp();
         return;
     };
 
-    var output: ?[]const u8 = null;
-    var target: ?[]const u8 = null;
+    const cmd_args = if (args.len > 2) args[2..] else &[_][]const u8{};
 
-    while (args.next()) |arg| {
-        if (std.mem.eql(u8, arg, "-o")) {
-            output = args.next();
-        } else if (std.mem.eql(u8, arg, "--target") or std.mem.eql(u8, arg, "-t")) {
-            target = args.next();
-        }
+    switch (cmd) {
+        // Toolchain
+        .install => try toolchain.install(alloc, cmd_args),
+        .uninstall => try toolchain.uninstall(alloc, cmd_args),
+        .list => try toolchain.list(alloc),
+        .use => try toolchain.use(alloc, cmd_args),
+
+        // Apps
+        .add => try apps.add(alloc, cmd_args),
+        .remove => try apps.remove(alloc, cmd_args),
+        .run => try apps.run(alloc, cmd_args),
+
+        // Framework
+        .init => try framework.init(alloc, cmd_args),
+        .build => try framework.build(alloc, cmd_args),
+        .watch => try framework.watch(alloc, cmd_args),
+
+        // Meta
+        .help => printHelp(),
+        .version => printVersion(),
     }
-
-    const result = try compiler.compileFile(alloc, file, target);
-
-    if (output) |out_path| {
-        const out_file = try std.fs.cwd().createFile(out_path, .{});
-        defer out_file.close();
-        try out_file.writeAll(result);
-        std.debug.print("Written to {s}\n", .{out_path});
-    } else {
-        std.debug.print("{s}", .{result});
-    }
 }
 
-fn cmdInit(alloc: std.mem.Allocator) !void {
-    _ = alloc;
-    const file = std.fs.cwd().createFile("zid.json", .{ .exclusive = true }) catch |err| {
-        if (err == error.PathAlreadyExists) {
-            std.debug.print("zid.json already exists\n", .{});
-            return;
-        }
-        return err;
-    };
-    defer file.close();
-
-    try file.writeAll(
-        \\{
-        \\  "overrides": {}
-        \\}
-        \\
-    );
-    std.debug.print("Created zid.json\n", .{});
+fn parseCommand(arg: []const u8) ?Command {
+    const map = std.StaticStringMap(Command).initComptime(.{
+        .{ "install", .install },
+        .{ "i", .install },
+        .{ "uninstall", .uninstall },
+        .{ "rm", .uninstall },
+        .{ "list", .list },
+        .{ "ls", .list },
+        .{ "use", .use },
+        .{ "add", .add },
+        .{ "remove", .remove },
+        .{ "run", .run },
+        .{ "init", .init },
+        .{ "build", .build },
+        .{ "b", .build },
+        .{ "watch", .watch },
+        .{ "w", .watch },
+        .{ "help", .help },
+        .{ "-h", .help },
+        .{ "--help", .help },
+        .{ "version", .version },
+        .{ "-v", .version },
+        .{ "--version", .version },
+    });
+    return map.get(arg);
 }
 
-fn cmdNew(alloc: std.mem.Allocator, args: *std.process.ArgIterator) !void {
-    const module_name = args.next() orelse {
-        std.debug.print("Usage: zid new <@lang/name | @target/name>\n", .{});
-        return;
-    };
-
-    try modules.create(alloc, module_name);
-    std.debug.print("Created {s}\n", .{module_name});
-}
-
-fn printUsage() void {
-    std.debug.print(
-        \\zid - modular transpiler framework
+fn printHelp() void {
+    const help =
+        \\Zid - Universal Development Toolkit
         \\
-        \\Usage: zid <command> [args]
+        \\Usage: zid <command> [options]
         \\
-        \\Commands:
-        \\  add <module>          Install @lang/* or @target/*
-        \\  remove <module>       Uninstall module
-        \\  list                  List installed modules
-        \\  config <action>       Configure lang -> target mappings
-        \\    add <lang> <target>   Add mapping
-        \\    set <lang> <target>   Set default target
-        \\    remove <lang> <target> Remove mapping
-        \\    list                  Show config
-        \\  run <file>            Transpile and execute
-        \\  build <file>          Transpile to file
-        \\  init                  Create zid.json
-        \\  new <module>          Create new module
-        \\  help                  Show this help
-        \\  version               Show version
+        \\Toolchain Commands:
+        \\  install, i <tool>[@version]   Install a tool (zig, rust, bun, node...)
+        \\  uninstall, rm <tool>          Remove a tool
+        \\  list, ls                      List installed tools
+        \\  use <tool>@<version>          Switch active version
+        \\
+        \\Apps Commands:
+        \\  add <path|url>                Add app to registry (becomes a command)
+        \\  remove <name>                 Remove app from registry
+        \\  run <name> [args]             Run an app explicitly
+        \\
+        \\Framework Commands:
+        \\  init [template]               Initialize a new transpiler project
+        \\  build, b                      Build the project
+        \\  watch, w                      Watch and rebuild on changes
+        \\
+        \\Options:
+        \\  -h, --help                    Show this help
+        \\  -v, --version                 Show version
         \\
         \\Examples:
-        \\  zid add @lang/lua
-        \\  zid add @target/wat
-        \\  zid config add lua wat
-        \\  zid run file.lua
-        \\  zid build file.lua -o out.wat
+        \\  zid install zig@0.13.0        Install Zig 0.13.0
+        \\  zid install rust              Install latest Rust
+        \\  zid add ./my-tool             Add local tool as command
+        \\  zid init lua-to-wasm          Create new transpiler project
         \\
-    , .{});
+    ;
+    std.debug.print("{s}", .{help});
+}
+
+fn printVersion() void {
+    std.debug.print("zid 0.1.0\n", .{});
 }
