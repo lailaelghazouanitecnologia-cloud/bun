@@ -10,6 +10,7 @@ pub const InstallCommand = @import("cli/install.zig");
 pub const AddCommand = @import("cli/add.zig");
 pub const InitCommand = @import("cli/init.zig");
 pub const BuildCommand = @import("cli/build.zig");
+pub const CapsuleCommand = @import("cli/capsule.zig");
 pub const HelpCommand = @import("cli/help.zig");
 
 // Subsystems
@@ -62,12 +63,16 @@ pub const Command = enum {
     // Apps
     add,
     remove,
+    // Capsules
+    capsule,
     // Framework
     init,
     build,
     watch,
     // Meta
     help,
+    update,
+    patch,
 
     pub fn parse(s: []const u8) ?Command {
         const map = std.StaticStringMap(Command).initComptime(.{
@@ -80,6 +85,8 @@ pub const Command = enum {
             .{ "use", .use },
             .{ "add", .add },
             .{ "remove", .remove },
+            .{ "capsule", .capsule },
+            .{ "cap", .capsule },
             .{ "init", .init },
             .{ "create", .init },
             .{ "build", .build },
@@ -87,6 +94,9 @@ pub const Command = enum {
             .{ "watch", .watch },
             .{ "w", .watch },
             .{ "help", .help },
+            .{ "update", .update },
+            .{ "upgrade", .update },
+            .{ "patch", .patch },
         });
         return map.get(s);
     }
@@ -99,10 +109,13 @@ pub const Command = enum {
             .use => InstallCommand.runUse(alloc, args),
             .add => AddCommand.run(alloc, args),
             .remove => AddCommand.runRemove(alloc, args),
+            .capsule => CapsuleCommand.run(alloc, args),
             .init => InitCommand.run(alloc, args),
             .build => BuildCommand.run(alloc, args),
             .watch => BuildCommand.runWatch(alloc, args),
             .help => HelpCommand.run(alloc, args),
+            .update => @import("cli/update.zig").run(alloc, args),
+            .patch => @import("cli/patch.zig").run(alloc, args),
         }
     }
 };

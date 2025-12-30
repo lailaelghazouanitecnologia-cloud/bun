@@ -1,25 +1,37 @@
 # Zid
 
-**Universal Development Toolkit** - Un solo binario para gestionar toolchains, apps, y crear transpilers.
+**Universal Development Toolkit** - Un solo binario para gestionar toolchains, apps, capsules, y crear transpilers.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  ZID = Toolchain Manager + Apps Registry + Transpiler Framework │
-└─────────────────────────────────────────────────────────────────┘
-         │                    │                    │
-         ▼                    ▼                    ▼
-    ┌─────────┐         ┌─────────┐         ┌─────────────┐
-    │ zig     │         │ mi-tool │         │ lua → wasm  │
-    │ rust    │         │ scripts │         │ dsl → rust  │
-    │ bun     │         │ builds  │         │ custom lang │
-    │ node    │         └─────────┘         └─────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ZID = Toolchain Manager + Apps Registry + Capsules + Transpiler Framework  │
+└─────────────────────────────────────────────────────────────────────────────┘
+         │                    │                │                  │
+         ▼                    ▼                ▼                  ▼
+    ┌─────────┐         ┌─────────┐      ┌──────────┐      ┌─────────────┐
+    │ zig     │         │ mi-tool │      │ webgpu   │      │ lua → wasm  │
+    │ rust    │         │ scripts │      │ wasm     │      │ dsl → rust  │
+    │ bun     │         │ builds  │      │ sqlite   │      │ custom lang │
+    │ node    │         └─────────┘      └──────────┘      └─────────────┘
     │ go      │
+    │ deno    │
     └─────────┘
 ```
 
-## El Plan
+## Instalación
+
+```bash
+# Build from source
+zig build -Doptimize=ReleaseFast
+
+# Add to PATH
+export PATH="$HOME/.zid/bin:$PATH"
+```
+
+## Comandos
 
 ### 1. Toolchain Manager
+
 Descargar e instalar compiladores/runtimes automáticamente:
 
 ```bash
@@ -28,7 +40,7 @@ zid install zig@0.13.0       # Versión específica
 zid install rust node go     # Múltiples
 zid list                     # Ver instalados
 zid use bun@1.0.0            # Cambiar versión activa
-zid remove rust@1.75.0       # Eliminar
+zid uninstall rust@1.75.0    # Eliminar
 ```
 
 **Toolchains soportados:**
@@ -42,6 +54,7 @@ zid remove rust@1.75.0       # Eliminar
 | `deno` | github.com/denoland/deno | zip |
 
 ### 2. Apps Registry
+
 Tus programas se convierten en comandos directos:
 
 ```bash
@@ -51,44 +64,62 @@ zid my-script                # Ejecutar directamente (sin "zid run")
 zid remove my-script         # Eliminar del registry
 ```
 
-### 3. Transpiler Framework
+### 3. Capsules (Library System)
+
+Librería de módulos reutilizables (como WebGPU bindings, WASM runtime, etc.):
+
+```bash
+zid capsule add webgpu       # Instalar capsule
+zid capsule add sqlite       # Otra capsule
+zid capsule list             # Ver instaladas
+zid capsule info webgpu      # Detalles
+zid capsule remove webgpu    # Eliminar
+zid capsule available        # Ver disponibles
+```
+
+**Capsules disponibles (built-in):**
+| Capsule | Descripción |
+|---------|-------------|
+| `webgpu` | WebGPU bindings para GPU computing |
+| `wasm` | WebAssembly runtime integration |
+| `sqlite` | SQLite database bindings |
+| `crypto` | Extended cryptographic operations |
+| `http2` | HTTP/2 protocol support |
+| `image` | Image encoding/decoding (PNG, JPEG, WebP) |
+
+**Tipos de capsules:**
+- `intern/` - Built-in, bundled con zid
+- `extern/` - External, descargadas del registry
+
+### 4. Self-Update
+
+Actualizar zid sin perder configuración:
+
+```bash
+zid update                   # Actualizar a la última versión
+zid update --check           # Solo verificar si hay updates
+zid update 0.2.0             # Actualizar a versión específica
+```
+
+### 5. Patches (Urgent Fixes)
+
+Sistema de parches para correcciones urgentes:
+
+```bash
+zid patch check              # Ver parches disponibles
+zid patch apply              # Aplicar todos los parches
+zid patch list               # Ver parches aplicados
+zid patch rollback <id>      # Revertir un parche
+```
+
+### 6. Transpiler Framework
+
 API para crear transpilers con Pipeline + Metadata:
 
 ```bash
 zid init lua-to-wasm         # Crear proyecto transpiler
 zid build                    # Compilar
-```
-
-## Estado Actual
-
-### Implementado (misc/)
-
-Core patterns siguiendo arquitectura de Bun:
-
-| Módulo | Descripción | Estado |
-|--------|-------------|--------|
-| `maybe.zig` | `Maybe(T)` error union con contexto | ✅ |
-| `dispatch.zig` | Opcode dispatch comptime (VM-like) | ✅ |
-| `buffers.zig` | Threadlocal buffers pre-allocated | ✅ |
-| `state.zig` | State machines basadas en unions | ✅ |
-| `logger.zig` | Logging estructurado + Location | ✅ |
-| `options.zig` | Target, OptLevel, BuildOptions | ✅ |
-| `cache.zig` | FileCache, ContentCache, LruCache | ✅ |
-| `progress.zig` | ProgressBar, Spinner, TaskTracker | ✅ |
-| `collections/` | SmallList, HivePool | ✅ |
-
-### Por Implementar
-
-```
-[ ] toolchain/downloader.zig   - HTTP download con progress
-[ ] toolchain/extractor.zig    - Descomprimir tar.gz/zip/xz
-[ ] toolchain/registry.zig     - URLs y versiones por tool
-[ ] toolchain/versions.zig     - Parsing de versiones semver
-[ ] toolchain/installer.zig    - Orquestador de instalación
-[ ] apps/registry.zig          - Base de datos de apps
-[ ] apps/runner.zig            - Ejecutor de apps
-[ ] framework/pipeline.zig     - Pipeline de transpilación
-[ ] framework/ir.zig           - Intermediate representation
+zid watch                    # Watch mode
 ```
 
 ## Arquitectura
@@ -108,6 +139,9 @@ src/
 │   ├── add.zig           # zid add <app>
 │   ├── init.zig          # zid init <project>
 │   ├── build.zig         # zid build
+│   ├── capsule.zig       # zid capsule <subcommand>
+│   ├── update.zig        # zid update
+│   ├── patch.zig         # zid patch <subcommand>
 │   └── help.zig          # zid help
 │
 ├── misc/                 # Core Patterns (VM-like, Bun style)
@@ -124,7 +158,23 @@ src/
 │       └── pool.zig      # HivePool (stable pointers)
 │
 ├── toolchain/            # Toolchain Manager
-│   └── toolchain.zig
+│   ├── toolchain.zig     # Public API
+│   ├── versions.zig      # Semver parsing
+│   ├── registry.zig      # Tool definitions
+│   ├── downloader.zig    # HTTP client + progress
+│   ├── extractor.zig     # tar.gz/xz/zip extraction
+│   └── installer.zig     # Install orchestration
+│
+├── capsules/             # Capsule System
+│   ├── capsules.zig      # Manager API
+│   ├── registry.zig      # Built-in definitions
+│   ├── fetcher.zig       # Download externals
+│   └── manifest.zig      # Capsule manifest format
+│
+├── patches/              # Patch System
+│   ├── patches.zig       # Manager API
+│   ├── registry.zig      # Fetch available patches
+│   └── applicator.zig    # Apply patches
 │
 ├── apps/                 # Apps Registry
 │   └── apps.zig
@@ -133,6 +183,65 @@ src/
     ├── framework.zig
     ├── metadata.zig
     └── pipeline.zig
+```
+
+## Estado de Implementación
+
+### Core Patterns (misc/) ✅
+
+| Módulo | Descripción | Estado |
+|--------|-------------|--------|
+| `maybe.zig` | `Maybe(T)` error union con contexto | ✅ |
+| `dispatch.zig` | Opcode dispatch comptime (VM-like) | ✅ |
+| `buffers.zig` | Threadlocal buffers pre-allocated | ✅ |
+| `state.zig` | State machines basadas en unions | ✅ |
+| `logger.zig` | Logging estructurado + Location | ✅ |
+| `options.zig` | Target, OptLevel, BuildOptions | ✅ |
+| `cache.zig` | FileCache, ContentCache, LruCache | ✅ |
+| `progress.zig` | ProgressBar, Spinner, TaskTracker | ✅ |
+| `collections/` | SmallList, HivePool | ✅ |
+
+### Toolchain Manager ✅
+
+| Módulo | Descripción | Estado |
+|--------|-------------|--------|
+| `versions.zig` | Semver parsing y comparación | ✅ |
+| `registry.zig` | Definición de tools + URLs | ✅ |
+| `downloader.zig` | HTTP download con progress | ✅ |
+| `extractor.zig` | tar.gz, tar.xz, zip | ✅ |
+| `installer.zig` | Orquestación completa | ✅ |
+
+### Capsules System ✅
+
+| Módulo | Descripción | Estado |
+|--------|-------------|--------|
+| `capsules.zig` | Manager API | ✅ |
+| `registry.zig` | Built-in capsule definitions | ✅ |
+| `fetcher.zig` | External capsule download | ✅ |
+| `manifest.zig` | Capsule manifest parsing | ✅ |
+
+### Patches System ✅
+
+| Módulo | Descripción | Estado |
+|--------|-------------|--------|
+| `patches.zig` | Manager API | ✅ |
+| `registry.zig` | Fetch available patches | ✅ |
+| `applicator.zig` | Apply patches | ✅ |
+
+### Self-Update ✅
+
+| Feature | Descripción | Estado |
+|---------|-------------|--------|
+| Version check | Consultar API por nuevas versiones | ✅ |
+| Atomic update | Reemplazo atómico con rollback | ✅ |
+| Checksum verify | Verificación de integridad | ✅ |
+
+### Pendiente
+
+```
+[ ] Apps registry - Base de datos persistente
+[ ] Framework IR - Intermediate representation
+[ ] Server component - Para registry remoto
 ```
 
 ## Patrones Core (de Bun)
@@ -178,13 +287,6 @@ log.debug("downloading {s}", .{url});
 log.err("failed: {s}", .{msg});
 ```
 
-## Próximos Pasos
-
-1. **Downloader**: HTTP client con progress callback
-2. **Extractor**: Soportar tar.gz, tar.xz, zip
-3. **Registry**: JSON/TOML con URLs de releases
-4. **Install command**: Orquestar download → extract → link
-
 ## Directorios
 
 ```
@@ -202,6 +304,17 @@ log.err("failed: {s}", .{msg});
 │   │   └── 0.13.0/
 │   └── ...
 │
+├── capsules/             # Librería de módulos
+│   ├── intern/           # Built-in capsules
+│   │   ├── webgpu/
+│   │   └── sqlite/
+│   └── extern/           # Downloaded capsules
+│
+├── patches/              # Parches aplicados
+│   ├── applied.json      # Registro de parches
+│   ├── scripts/          # Parches de script
+│   └── data/             # Parches de datos
+│
 ├── apps/                 # Apps registradas
 │   └── my-app/
 │
@@ -210,10 +323,21 @@ log.err("failed: {s}", .{msg});
 └── config.json           # Configuración global
 ```
 
+## Debug
+
+Habilitar logging por subsistema:
+
+```bash
+ZID_DEBUG_TOOLCHAIN=1 zid install bun
+ZID_DEBUG_DOWNLOAD=1 zid install zig
+ZID_DEBUG_CAPSULES=1 zid capsule add webgpu
+ZID_DEBUG_PATCHES=1 zid patch check
+```
+
 ## Build
 
 ```bash
-# Compilar
+# Compilar release
 zig build -Doptimize=ReleaseFast
 
 # Output

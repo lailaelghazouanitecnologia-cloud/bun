@@ -70,6 +70,8 @@ pub const cli = @import("cli.zig");
 pub const toolchain = @import("toolchain/toolchain.zig");
 pub const apps = @import("apps/apps.zig");
 pub const framework = @import("framework/framework.zig");
+pub const capsules = @import("capsules/capsules.zig");
+pub const patches = @import("patches/patches.zig");
 
 // ============ ALLOCATORS ============
 
